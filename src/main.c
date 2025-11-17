@@ -5,7 +5,7 @@
 enum token_type;
 struct token_struct;
 char *symbols[] = { // sort by len of symbol
-    "bitcast", "sizeof", "cast", "<<=", ">>=", "..", "+=", "-=", "*=",
+    "bitcast", "sizeof", "cast", "<<=", ">>=", "..", "+=", "-=", "*=", ":=",
     "/=",      "&=",     "^=",   "|=",  "%=",  "||", "&&", "==", "!=",
     ">=",      "<=",     "<<",   ">>",  "++",  "--", "->"};
 #define LOCAL_LEN(ARR) (sizeof(ARR) / sizeof(ARR[0]))
@@ -52,6 +52,18 @@ typedef struct node_struct {
   char *name; // needed for variables with something like
               // brackets attached to it
 } node;
+
+typedef struct variable_struct {
+	char* name;
+	char* alias_LLVM;
+	
+	struct variable_struct* dependencies;
+
+	size_t scope;
+} variable;
+
+variable** variable_list;
+size_t variable_list_length;
 
 void append_token_c(token **code_lex, size_t *code_lex_size,
                     size_t *code_lex_index, enum token_type type,
@@ -339,6 +351,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       continue;
 
     if (!colon_mode && raw_code[i] == ':') {
+	    if (strlen_raw_code > i + 1 && raw_code[i + 1] == '=') break;
       colon_mode++;
       colon_buf_start = i + 1;
 
@@ -498,6 +511,8 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     if (code_lex[i].type == get_symbol("+="))
       id = '=';
     else if (code_lex[i].type == get_symbol("-="))
+      id = '=';
+    else if (code_lex[i].type == get_symbol(":="))
       id = '=';
     else if (code_lex[i].type == get_symbol("*="))
       id = '=';
@@ -1627,7 +1642,41 @@ void print_tree(node *root, size_t tabs) {
     print_tree(root->right, tabs + 1);
 }
 
+char* assign_LLVM(token* left, token* right){
+
+}
+
+token* evaluate(node* root){
+	switch (root->type) {
+		case PROGRAM:
+			evaluate(root->right);
+			return evaluate(root->left);
+
+		case LITERAL:
+			return root->token_argument;
+
+		case get_symbol(":="):
+			token* right = evaluate(root->right);
+			token* left = evaluate(root->left);
+			
+			variable* new_var = malloc(sizeof(variable));
+			new_var->name = left->string_argument;
+			new_var->alias_LLVM = assign_LLVM(left, right);
+			// DO MORE STUFF HERE
+				
+			variable_list_length++;
+			variable_list = realloc(variable_list, sizeof(variable*) * (variable_list_length));
+			variable_list[variable_list_length - 1] = new_var;
+			
+		default:
+			return NULL;
+
+	}
+}
+
 int main(int argc, char **argv) {
+	variable_list = malloc(sizeof(variable));
+	variable_list_length = 0;
   size_t strlen_argv_1 =
       strlen(argv[1]); // "argv[1]" because I don't want to have to deal with
                        // file management until I need to
@@ -1654,6 +1703,8 @@ int main(int argc, char **argv) {
 
   printf("\n");
   print_tree(root, 0);
+
+  evaluate(root);
 
   //    printf("%d\n%d\n", PROGRAM, code_tree_ptr->type);
   return 0;
