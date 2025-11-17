@@ -1219,6 +1219,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     case '-':
     case '+':
     case '!':
+    case '@:
     case 'U': {
       int restore_i = i + 1;
       i += 2;
