@@ -1219,7 +1219,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     case '-':
     case '+':
     case '!':
-    case '@:
+    case '@':
     case 'U': {
       int restore_i = i + 1;
       i += 2;
@@ -1229,7 +1229,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->left->right = malloc(sizeof(node));
       code_tree_ptr->left->left->back = code_tree_ptr->left;
       code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
       code_tree_ptr->left->right->back = code_tree_ptr->left;
 
       int restore_i_minus_i = 1;
@@ -1257,7 +1257,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->left->right = malloc(sizeof(node));
       code_tree_ptr->left->left->back = code_tree_ptr->left;
       code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
       code_tree_ptr->left->right->back = code_tree_ptr->left;
 
       int restore_i_minus_i = restore_i - i;
@@ -1305,7 +1305,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->left->right = malloc(sizeof(node));
       code_tree_ptr->left->left->back = code_tree_ptr->left;
       code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
       code_tree_ptr->left->right->back = code_tree_ptr->left;
 
       code_tree_ptr->left->type = (enum node_type)'(';
@@ -1331,7 +1331,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->left->right = malloc(sizeof(node));
       code_tree_ptr->left->left->back = code_tree_ptr->left;
       code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
       code_tree_ptr->left->right->back = code_tree_ptr->left;
 
       code_tree_ptr->left->type = (enum node_type)'{';
@@ -1357,7 +1357,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->left->right = malloc(sizeof(node));
       code_tree_ptr->left->left->back = code_tree_ptr->left;
       code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
       code_tree_ptr->left->right->back = code_tree_ptr->left;
 
       code_tree_ptr->left->type = (enum node_type)'[';
@@ -1460,7 +1460,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->left->right = malloc(sizeof(node));
           code_tree_ptr->left->left->back = code_tree_ptr->left;
           code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = END;
+          code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
           code_tree_ptr->left->right->back = code_tree_ptr->left;
 
           code_tree_ptr->left->type = (enum node_type)'(';
@@ -1487,7 +1487,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->left->right = malloc(sizeof(node));
           code_tree_ptr->left->left->back = code_tree_ptr->left;
           code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = END;
+          code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
           code_tree_ptr->left->right->back = code_tree_ptr->left;
 
           code_tree_ptr->left->type = (enum node_type)'[';
@@ -1514,7 +1514,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->left->right = malloc(sizeof(node));
           code_tree_ptr->left->left->back = code_tree_ptr->left;
           code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = END;
+          code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
           code_tree_ptr->left->right->back = code_tree_ptr->left;
 
           code_tree_ptr->left->type = (enum node_type)'{';
@@ -1581,7 +1581,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->left->right = malloc(sizeof(node));
       code_tree_ptr->left->left->back = code_tree_ptr->left;
       code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->type = END; code_tree_ptr->left->right->token_argument = NULL;
       code_tree_ptr->left->right->back = code_tree_ptr->left;
 
       int restore_i_minus_i = restore_i - i;
@@ -1644,16 +1644,17 @@ int main(int argc, char **argv) {
 
   // MOVE THIS WHOLE SETUP TO ITS OWN FUNCTION SO THAT IT CAN RECURSE
   node code_tree;
-  node *code_tree_ptr = &code_tree;
+  node *root = &code_tree;
   code_tree.type = PROGRAM;
   code_tree.back = NULL;
   code_tree.left = malloc(sizeof(node));
   code_tree.right = malloc(sizeof(node));
 
-  tree(code_tree_ptr, code_lex, code_lex_index);
+  tree(root, code_lex, code_lex_index);
 
   printf("\n");
-  print_tree(&code_tree, 0);
+  print_tree(root, 0);
+
   //    printf("%d\n%d\n", PROGRAM, code_tree_ptr->type);
   return 0;
 }
