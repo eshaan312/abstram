@@ -1,7 +1,7 @@
 SRC = src/*.c 
-END = build/wall.bin 
-END_D = build/wall_debug.bin
-END_O = build/wall_optimal.bin
+END = build/nisse.bin 
+END_D = build/nisse_debug.bin
+END_O = build/nisse_optimal.bin
 
 COMP = gcc
 FLAGS = -I include
