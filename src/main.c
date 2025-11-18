@@ -6,7 +6,7 @@ enum token_type;
 struct token_struct;
 char *symbols[] = { // sort by len of symbol
     "bitcast", "sizeof", "cast", "<<=", ">>=", "..", "+=", "-=", "*=",
-    ":=",      "/=",     "&=",   "^=",  "|=",  "%=", "||", "&&", "==",
+    "=>",      "/=",     "&=",   "^=",  "|=",  "%=", "||", "&&", "==",
     "!=",      ">=",     "<=",   "<<",  ">>",  "++", "--", "->"};
 #define LOCAL_LEN(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
@@ -55,15 +55,14 @@ typedef struct node_struct {
 
 typedef struct variable_struct {
   char *name;
-  char *alias_LLVM;
-
+  char *type;
   struct variable_struct *dependencies;
-
   size_t scope;
 } variable;
 
 variable **variable_list;
 size_t variable_list_length;
+size_t scope;
 
 void append_token_c(token **code_lex, size_t *code_lex_size,
                     size_t *code_lex_index, enum token_type type,
@@ -350,9 +349,8 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
     } else if (colon_mode)
       continue;
 
-    if (!colon_mode && raw_code[i] == ':') {
-      if (strlen_argv_1 > i + 1 && raw_code[i + 1] == '=')
-        break;
+    if (!colon_mode && raw_code[i] == ':' &&
+        !(strlen_argv_1 > i + 1 && raw_code[i + 1] == '=')) {
       colon_mode++;
       colon_buf_start = i + 1;
 
@@ -513,7 +511,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       id = '=';
     else if (code_lex[i].type == get_symbol("-="))
       id = '=';
-    else if (code_lex[i].type == get_symbol(":="))
+    else if (code_lex[i].type == get_symbol("=>"))
       id = '=';
     else if (code_lex[i].type == get_symbol("*="))
       id = '=';
@@ -1652,24 +1650,29 @@ void print_tree(node *root, size_t tabs) {
     print_tree(root->right, tabs + 1);
 }
 
-char *assign_LLVM(token *left, token *right) { return ""; }
+void assign_dynIR(variable *left, variable *right) {
+  printf("%s = %s\n", left->name, right->name);
+}
 
-token *evaluate(node *root) {
+variable *evaluate(node *root) {
   if (root->type == PROGRAM) {
     evaluate(root->right);
     return evaluate(root->left);
 
   } else if (root->type == LITERAL) {
-    return root->token_argument;
-
-  } else if (root->type == get_symbol(":=")) {
-    token *right = evaluate(root->right);
-    token *left = evaluate(root->left);
-
     variable *new_var = malloc(sizeof(variable));
-    new_var->name = left->string_argument;
-    new_var->alias_LLVM = assign_LLVM(left, right);
-    // DO MORE STUFF HERE
+    new_var->name = root->token_argument->string_argument;
+
+  } else if (root->type == get_symbol("=>")) {
+    variable *new_var = malloc(sizeof(variable));
+    new_var->dependencies = malloc(sizeof(variable));
+    new_var->scope = scope;
+
+    variable *right = evaluate(root->right);
+    variable *left = evaluate(root->left);
+
+    new_var->name = left->name;
+    assign_dynIR(left, right);
 
     variable_list_length++;
     variable_list =
@@ -1683,6 +1686,8 @@ token *evaluate(node *root) {
 int main(int argc, char **argv) {
   variable_list = malloc(sizeof(variable));
   variable_list_length = 0;
+  scope = 0;
+
   size_t strlen_argv_1 =
       strlen(argv[1]); // "argv[1]" because I don't want to have to deal with
                        // file management until I need to
