@@ -1,2 +1,2 @@
-# Wall
+# Nisse
 Systems programming language
