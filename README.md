@@ -4,9 +4,9 @@
 <p align="center"><b>Nisse</b> - a convenient systems programming language<br>(by <a href="https://github.com/xmm16">@xmm16</a>)</p>
 
 #### Info:
-- Auto is short for "auto-templating language".
-- You define your own templates (patterns for the parser to look for) and assign functions to them, allowing you to define your own syntax!
+- I made Nisse because I didn't see the point of a lot of the complexity in languages like C++ and Rust.
+- I'm also a big fan of zero-cost abstractions so you'll see plenty of that (not built into the language, of course).
 
 #### Design:
-- Auto is designed to be very similar to C in terms of performance and default syntax.
-- The goal of this language is essentially to allow fully-featured and simple compile-time transpilation.
+- Nisse is designed to be very similar to C in terms of performance and syntax.
+- However, Nisse adds a few things that I think will make code easier to read and more enjoyable to write.
