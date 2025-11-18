@@ -56,12 +56,22 @@ typedef struct node_struct {
 typedef struct variable_struct {
   char *name;
   char *type;
-  struct variable_struct *dependencies;
+  int memtype; // stack=0, heap=1
   size_t scope;
+  size_t scope_to_destroy;
 } variable;
 
 variable **variable_list;
 size_t variable_list_length;
+
+typedef struct instruction_struct {
+	int id;
+	size_t args_len;
+	variable** args;
+} instruction;
+
+instruction **program;
+size_t program_length;
 size_t scope;
 
 void append_token_c(token **code_lex, size_t *code_lex_size,
@@ -349,8 +359,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
     } else if (colon_mode)
       continue;
 
-    if (!colon_mode && raw_code[i] == ':' &&
-        !(strlen_argv_1 > i + 1 && raw_code[i + 1] == '=')) {
+    if (!colon_mode && raw_code[i] == ':'){
       colon_mode++;
       colon_buf_start = i + 1;
 
@@ -1639,7 +1648,7 @@ void print_tree(node *root, size_t tabs) {
     printf("   ");
   printf("left type: %d\n", root->left->type);
 
-  if (root->left->type != LITERAL && root->left->type != END)
+  if (root->left->type !>= LITERAL && root->left->type != END)
     print_tree(root->left, tabs + 1);
 
   for (int i = 0; i < tabs; i++)
@@ -1651,41 +1660,62 @@ void print_tree(node *root, size_t tabs) {
 }
 
 void assign_dynIR(variable *left, variable *right) {
-  printf("%s = %s\n", left->name, right->name);
+	instruction* new_assignment;
+	new_assignment->id = '=';
+	new_assignment->args = malloc(sizeof(variable) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program_length, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("INIT: %s = %s\n", left->name, right->name);
 }
 
-variable *evaluate(node *root) {
-  if (root->type == PROGRAM) {
-    evaluate(root->right);
-    return evaluate(root->left);
+variable *evaluate(node *root, variable* high_var, int id) {
+	if (root->type == PROGRAM){
+		evaluate(root->right, high_var, id);
+		return evaluate(root->left, high_var, id);
+	} else if (root->type == LITERAL){
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = root->token_argument->string_argument;
+			for (int i = 0; i < variables_list_length; i++){
+				if (high_var != NULL && strcmp(variable_list[i].name, new_var->name) == 0 && variable_list[i].memtype == 1 && variable_list[i].scope_to_destroy < high_var->scope_to_destroy){
+					variable_list[i].scope_to_destroy = high_var->scope_to_destroy;
+				} // basically, when inserting frees at the end, check the scope_to_destroy to see when to actually free the variable. however, the actual scope is the actual scope its defined in so errors can work.
+				else if (strcmp(variable_list[i].name, new_var->name) == 0) return &(variable_list[i]);
+			}
+		
+		if (id == '='){
+			new_var->scope = scope;
+			new_var->scope_to_destroy = scope;
+		// ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
+		}
 
-  } else if (root->type == LITERAL) {
-    variable *new_var = malloc(sizeof(variable));
-    new_var->name = root->token_argument->string_argument;
+		return new_var;
+	} else if (root->type == '='){
+		variable* new_var = malloc(sizeof(variable));
 
-  } else if (root->type == get_symbol("=>")) {
-    variable *new_var = malloc(sizeof(variable));
-    new_var->dependencies = malloc(sizeof(variable));
-    new_var->scope = scope;
+		variable* left = evaluate(root->left, NULL, '=');
+		variable* right = evaluate(root->right, new_var, '='); 
+		
+		assign_dynIR(left, right);
 
-    variable *right = evaluate(root->right);
-    variable *left = evaluate(root->left);
+		variable_list_length++;
+		variable_list = realloc(variable_list, variable_list_length * sizeof(variable*));
+		variable_list[variable_list_length - 1] = new_var;
 
-    new_var->name = left->name;
-    assign_dynIR(left, right);
-
-    variable_list_length++;
-    variable_list =
-        realloc(variable_list, sizeof(variable *) * (variable_list_length));
-    variable_list[variable_list_length - 1] = new_var;
-  }
-
-  return NULL;
+		return new_var;
+	}
 }
 
 int main(int argc, char **argv) {
-  variable_list = malloc(sizeof(variable));
+  variable_list = malloc(sizeof(variable*));
   variable_list_length = 0;
+
+	program = malloc(sizeof(instruction*));
+	program_length = 0;
+
   scope = 0;
 
   size_t strlen_argv_1 =
@@ -1715,7 +1745,7 @@ int main(int argc, char **argv) {
   printf("\n");
   print_tree(root, 0);
 
-  evaluate(root);
+evaluate(root, NULL, PROGRAM);
 
   //    printf("%d\n%d\n", PROGRAM, code_tree_ptr->type);
   return 0;
