@@ -20,14 +20,14 @@
   - **TL;DR:** Dependency-checking lets you to treat the language like it's garbage-collected but with basically no runtime cost.
 
 - **Potential concerns:**
-  - **Q:** If 'A' owns 'B', 'B' owns 'C', and 'C' owns 'A', what will happen?    
-    **A:** Ownership isn't really a thing using dependency-checking, but, if 'B' depends on 'A' and 'C' depends on 'B' and 'A' depends on 'C', it'll be freed at the highest lifetime value in the group. So if 'C' has global scope and both 'A' and 'B' have local scopes, both 'A' and 'B' will recieve extended lifetimes to match 'C'. 
+  - If 'A' owns 'B', 'B' owns 'C', and 'C' owns 'A', what will happen?    
+    - Ownership isn't really a thing using dependency-checking, but, if 'B' depends on 'A' and 'C' depends on 'B' and 'A' depends on 'C', it'll be freed at the highest lifetime value in the group. So if 'C' has global scope and both 'A' and 'B' have local scopes, both 'A' and 'B' will recieve extended lifetimes to match 'C'. 
            
-  - **Q:** If a function runs a complex calculation to determine if it'll make a heap allocation, how do you know if it's ends up being made or not, and when to free it?    
-    **A:** In these situations, a static array is created for the scope, and at the end of the scope, it'll loop through the array and free all addresses inside it (this process has the same runtime cost as its typical implementation in memory-unsafe languages). If no potential heap allocations are detected, neither the static array or the loop will exist in the resulting compilation.
+  - If a function runs a complex calculation to determine if it'll make a heap allocation, how do you know if it's ends up being made or not, and when to free it?    
+    - In these situations, a static array is created for the scope, and at the end of the scope, it'll loop through the array and free all addresses inside it (this process has the same runtime cost as its typical implementation in memory-unsafe languages). If no potential heap allocations are detected, neither the static array or the loop will exist in the resulting compilation.
           
-  - **Q:** How is aliasing done?    
-    **A:** Aliases are identified by the compiler and do not have a lifetime value. However, if another piece of data depends on a heap-allocated alias, it will modify the lifetime of the original allocation accordingly.
+  - How is aliasing done?    
+    - Aliases are identified by the compiler and do not have a lifetime value. However, if another piece of data depends on a heap-allocated alias, it will modify the lifetime of the original allocation accordingly.
 
 #### Credits:
 - README image from [Hilda](https://en.wikipedia.org/wiki/Hilda_(TV_series)) (a Netflix show)
