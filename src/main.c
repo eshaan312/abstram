@@ -1917,6 +1917,39 @@ void iter_div_dynIR(variable *left) {
   	printf("SSA: SSA / %s\n", left->name);
 }
 
+void mod_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = '%';
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+  printf("NEW SSA: %s %c %s\n", left->name, '%', right->name);
+	else 
+  printf("SSA: %s %c %s\n", left->name, '%', right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void iter_mod_dynIR(variable *left) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = '%' + 1000; // +1000 means iterative
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  	printf("SSA: SSA %c %s\n", '%', left->name);
+}
+
 void add_dynIR(variable *left, variable *right) {
 	instruction* new_assignment = malloc(sizeof(instruction));
 	new_assignment->id = '+';
@@ -2038,7 +2071,18 @@ variable *evaluate(node *root, variable* high_var, int id) {
 		new_var->name[3] = '\0';
 		strcpy(new_var->name, "SSA");
 		return new_var;
-	}
+	} else if (root->type == '%'){
+                variable* left = evaluate(root->left, high_var, '%');
+                variable* right = evaluate(root->right, high_var, '%');
+                if (right == NULL) iter_mod_dynIR(left);
+                else mod_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }
 }
 
 int main(int argc, char **argv) {
