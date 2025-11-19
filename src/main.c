@@ -464,7 +464,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     case ',':;
       int restore_i = i;
       i--;
-      while (i != -1 && code_lex[i].type != '|') {
+      while (i != -1 && code_lex[i].type != ',') {
         i--;
       }
 
@@ -487,7 +487,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
 
       i = restore_i;
       i++;
-      while (i != code_lex_index && code_lex[i].type != '|') {
+      while (i != code_lex_index && code_lex[i].type != ',') {
         i++;
       }
 
@@ -506,7 +506,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type != ','){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -585,7 +596,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+    tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
       return;
     }
     default:
@@ -648,7 +659,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+            if (code_lex[i].type != get_symbol("||")){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     }
     default:
@@ -711,7 +733,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                  if (code_lex[i].type != get_symbol("&&")){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -767,7 +800,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                  if (code_lex[i].type != get_symbol("|")){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -823,7 +867,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                  if (code_lex[i].type != get_symbol("^")){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -879,7 +934,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                  if (code_lex[i].type != get_symbol("&")){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -943,7 +1009,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                  if (code_lex[i].type != get_symbol("==") &&
+             code_lex[i].type != get_symbol("!=")){
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -1013,7 +1091,20 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                        if (code_lex[i].type != get_symbol(">=") &&
+             code_lex[i].type != get_symbol("<=") && code_lex[i].type != '>' &&
+             code_lex[i].type != '<' && code_lex[i].type != get_symbol("..")) {
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -1077,7 +1168,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+                              if (code_lex[i].type != get_symbol("<<") &&
+             code_lex[i].type != get_symbol(">>")) {
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -1228,7 +1331,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+            if (code_lex[i].type != '*' &&
+             code_lex[i].type != '%' && code_lex[i].type != '/') {
+	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
+	      to_return[0].type = WORD;
+	      to_return[0].string_argument = malloc(4);
+	      to_return[0].string_argument[3] = '\0';
+	      strcpy(to_return[0].string_argument, "SSA");
+      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      } else {
+	      to_return = &code_lex[i];
+      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+      }
       return;
     default:
       break;
@@ -1924,3 +2039,4 @@ evaluate(root, NULL, PROGRAM);
   //    printf("%d\n%d\n", PROGRAM, code_tree_ptr->type);
   return 0;
 }
+
