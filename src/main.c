@@ -1092,7 +1092,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     case '+':;
       if (i == 0 ||
           (i > 0 && code_lex[i - 1].type != WORD &&
-           code_lex[i - 1].type != INT && code_lex[i - 1].type != FLOAT)) {
+           code_lex[i - 1].type != INT && code_lex[i - 1].type != FLOAT && code_lex[i - 1].type != '(' && code_lex[i - 1].type != '[' && code_lex[i - 1].type != '{')) {
         break;
       }
 
@@ -1646,14 +1646,20 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
 void print_tree(node *root, size_t tabs) {
   for (int i = 0; i < tabs; i++)
     printf("   ");
-  printf("left type: %d\n", root->left->type);
+  printf("left type: %d", root->left->type);
+  if (root->left->type == LITERAL){
+	  printf(" - %s\n", root->left->token_argument->string_argument);
+  } else printf("\n");
 
   if (root->left->type != LITERAL && root->left->type != END)
     print_tree(root->left, tabs + 1);
 
   for (int i = 0; i < tabs; i++)
     printf("   ");
-  printf("right type: %d\n", root->right->type);
+  printf("right type: %d", root->right->type);
+  if (root->right->type == LITERAL){
+	  printf(" - %s\n", root->right->token_argument->string_argument);
+  } else printf("\n");
 
   if (root->right->type != LITERAL && root->right->type != END)
     print_tree(root->right, tabs + 1);
@@ -1683,33 +1689,54 @@ void add_dynIR(variable *left, variable *right) {
 	program = realloc(program, sizeof(instruction*) * (program_length));
 	program[program_length - 1] = new_assignment;
   printf("SSA: %s + %s\n", left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
 }
+
+void iter_add_dynIR(variable *left) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = '+' + 1000; // +1000 means iterative
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  	printf("SSA: SSA + %s\n", left->name);
+}
+
 
 variable *evaluate(node *root, variable* high_var, int id) {
 	if (root->type == PROGRAM){
+		variable* to_return = evaluate(root->left, high_var, id);
 		evaluate(root->right, high_var, id);
-		return evaluate(root->left, high_var, id);
+		return to_return;
 	} else if (root->type == LITERAL){
 		variable* new_var = malloc(sizeof(variable));
 		new_var->name = root->token_argument->string_argument;
+		if (root->type == WORD){
 			for (int i = 0; i < variable_list_length; i++){
 				if (high_var != NULL && strcmp(variable_list[i]->name, new_var->name) == 0 && variable_list[i]->memtype == 1 && variable_list[i]->scope_to_destroy < high_var->scope_to_destroy){
 					variable_list[i]->scope_to_destroy = high_var->scope_to_destroy;
 				} // basically, when inserting frees at the end, check the scope_to_destroy to see when to actually free the variable. however, the actual scope is the actual scope its defined in so errors can work.
 				else if (strcmp(variable_list[i]->name, new_var->name) == 0) return (variable_list[i]);
 			}
-		
-		if (id == '='){
-			new_var->scope = scope;
-			new_var->scope_to_destroy = scope;
-		// ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
+
+			if (id == '='){
+				new_var->scope = scope;
+				new_var->scope_to_destroy = scope;
+			// ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
+			}
 		}
 
 		return new_var;
 	} else if (root->type == '='){
 		variable* new_var = malloc(sizeof(variable));
 
-		variable* left = evaluate(root->left, NULL, '=');
+		variable* left = evaluate(root->left, new_var, '=');
 		variable* right = evaluate(root->right, new_var, '='); 
 		
 		assign_dynIR(left, right);
@@ -1722,13 +1749,16 @@ variable *evaluate(node *root, variable* high_var, int id) {
 	} else if (root->type == '+'){
 		variable* left = evaluate(root->left, high_var, '+');
 		variable* right = evaluate(root->right, high_var, '+');
-
-		add_dynIR(left, right);
+		if (right == NULL) iter_add_dynIR(left);
+		else add_dynIR(left, right);
+		
 		variable* new_var = malloc(sizeof(variable));
 		new_var->name = malloc(4);
 		new_var->name[3] = '\0';
 		strcpy(new_var->name, "SSA");
 		return new_var;
+	} else if (root->type == END){
+		return NULL;
 	}
 }
 
