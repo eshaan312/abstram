@@ -16,8 +16,8 @@
 	- Nisse's main feature is memory-safety using "dependency-checking" instead of borrow-checking.
 	- At compile-time, each heap-allocated data structure in this language has a value that tells the compiler what scope it needs to be freed at (AKA the lifetime).
 	- By default, this value is set to the scope it was defined in, but when you, for example, assign the value to a global array, it'll end up being freed at the end of the program.
-  - This system gives you memory-safety without the difficulty and occasionally annoying rules that borrow-checking requires.
-  - **TL;DR:** Dependency-checking lets you to treat the language like it's garbage-collected but with basically no runtime cost.
+	- This system gives you memory-safety without the difficulty and occasionally annoying rules that borrow-checking requires.
+	- **TL;DR:** Dependency-checking lets you to treat the language like it's garbage-collected but with basically no runtime cost.
 
 - **Potential concerns:**
   - If 'A' owns 'B', 'B' owns 'C', and 'C' owns 'A', what will happen?    
