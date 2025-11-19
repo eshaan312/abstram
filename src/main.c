@@ -239,7 +239,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
                                  code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
-        append_token(&code_lex, &code_lex_size, &code_lex_index, '(',
+        append_token(&code_lex, &code_lex_size, &code_lex_index, WORD,
                      code_lex[code_lex_index].string_argument, lexed_paren);
       } else
         append_token(&code_lex, &code_lex_size, &code_lex_index, '(', NULL,
@@ -275,7 +275,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
                                  code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
-        append_token_b(&code_lex, &code_lex_size, &code_lex_index, '{',
+        append_token_b(&code_lex, &code_lex_size, &code_lex_index, WORD,
                        code_lex[code_lex_index].string_argument, lexed_paren);
       } else
         append_token_b(&code_lex, &code_lex_size, &code_lex_index, '{', NULL,
@@ -311,7 +311,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
                                  code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
-        append_token_bk(&code_lex, &code_lex_size, &code_lex_index, '[',
+        append_token_bk(&code_lex, &code_lex_size, &code_lex_index, WORD,
                         code_lex[code_lex_index].string_argument, lexed_paren);
       } else
         append_token_bk(&code_lex, &code_lex_size, &code_lex_index, '[', NULL,
@@ -347,7 +347,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
                                  code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
-        append_token_c(&code_lex, &code_lex_size, &code_lex_index, ':',
+        append_token_c(&code_lex, &code_lex_size, &code_lex_index, WORD,
                        code_lex[code_lex_index].string_argument, lexed_paren);
       } else
         continue;
@@ -1701,7 +1701,7 @@ void sub_dynIR(variable *left, variable *right) {
 	program_length++;
 	program = realloc(program, sizeof(instruction*) * (program_length));
 	program[program_length - 1] = new_assignment;
-  printf("SSA: %s + %s\n", left->name, right->name);
+  printf("SSA: %s - %s\n", left->name, right->name);
  /* int i = program_length - 2;
   while (i >= 0 && program[i]->id >= 1000){
   	printf("SSA: SSA + %s\n", left->name);
@@ -1718,8 +1718,9 @@ void iter_sub_dynIR(variable *left) {
 	program_length++;
 	program = realloc(program, sizeof(instruction*) * (program_length));
 	program[program_length - 1] = new_assignment;
-  	printf("SSA: SSA + %s\n", left->name);
+  	printf("SSA: SSA - %s\n", left->name);
 }
+
 void add_dynIR(variable *left, variable *right) {
 	instruction* new_assignment = malloc(sizeof(instruction));
 	new_assignment->id = '+';
