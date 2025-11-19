@@ -1648,7 +1648,7 @@ void print_tree(node *root, size_t tabs) {
     printf("   ");
   printf("left type: %d", root->left->type);
   if (root->left->type == LITERAL){
-	  printf(" - %s\n", root->left->token_argument->string_argument);
+	  printf("  -- %s\n", root->left->token_argument->string_argument);
   } else printf("\n");
 
   if (root->left->type != LITERAL && root->left->type != END)
@@ -1658,7 +1658,7 @@ void print_tree(node *root, size_t tabs) {
     printf("   ");
   printf("right type: %d", root->right->type);
   if (root->right->type == LITERAL){
-	  printf(" - %s\n", root->right->token_argument->string_argument);
+	  printf("  -- %s\n", root->right->token_argument->string_argument);
   } else printf("\n");
 
   if (root->right->type != LITERAL && root->right->type != END)
@@ -1795,10 +1795,11 @@ int main(int argc, char **argv) {
 
   tree(root, code_lex, code_lex_index);
 
-  printf("\n");
+  printf("\nPRINTED TREE:\n");
   print_tree(root, 0);
   printf("\n");
 
+  printf("\nPRINTED COMPILER IR:\n");
 evaluate(root, NULL, PROGRAM);
 
   //    printf("%d\n%d\n", PROGRAM, code_tree_ptr->type);
