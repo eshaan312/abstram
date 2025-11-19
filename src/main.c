@@ -57,7 +57,7 @@ typedef struct variable_struct {
   char *name;
   char *type;
   int memtype; // stack=0, heap=1, SSA=2
-  size_t scope;
+  int scope;
   size_t scope_to_destroy;
 } variable;
 
@@ -1665,7 +1665,7 @@ void print_tree(node *root, size_t tabs) {
     print_tree(root->right, tabs + 1);
 }
 
-void assign_dynIR(variable *left, variable *right) {
+void init_dynIR(variable *left, variable *right) {
 	instruction* new_assignment = malloc(sizeof(instruction));
 	new_assignment->id = '=';
 	new_assignment->args = malloc(sizeof(variable*) * 2);
@@ -1676,6 +1676,19 @@ void assign_dynIR(variable *left, variable *right) {
 	program = realloc(program, sizeof(instruction*) * (program_length));
 	program[program_length - 1] = new_assignment;
   printf("INIT: %s = %s\n", left->name, right->name);
+}
+
+void assign_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = '=';
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s\n", left->name, right->name);
 }
 
 void add_dynIR(variable *left, variable *right) {
@@ -1717,7 +1730,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
 	} else if (root->type == LITERAL){
 		variable* new_var = malloc(sizeof(variable));
 		new_var->name = root->token_argument->string_argument;
-		if (root->type == WORD){
+		if (root->token_argument->type == WORD){
 			for (int i = 0; i < variable_list_length; i++){
 				if (high_var != NULL && strcmp(variable_list[i]->name, new_var->name) == 0 && variable_list[i]->memtype == 1 && variable_list[i]->scope_to_destroy < high_var->scope_to_destroy){
 					variable_list[i]->scope_to_destroy = high_var->scope_to_destroy;
@@ -1726,26 +1739,30 @@ variable *evaluate(node *root, variable* high_var, int id) {
 			}
 
 			if (id == '='){
-				new_var->scope = scope;
+				new_var->scope = -1;
 				new_var->scope_to_destroy = scope;
+
 			// ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
 			}
 		}
 
 		return new_var;
 	} else if (root->type == '='){
-		variable* new_var = malloc(sizeof(variable));
-
-		variable* left = evaluate(root->left, new_var, '=');
-		variable* right = evaluate(root->right, new_var, '='); 
+		variable* left = evaluate(root->left, NULL, '=');
+		variable* right = evaluate(root->right, left, '='); 
 		
-		assign_dynIR(left, right);
+		if (left->scope != -1){
+			assign_dynIR(left, right);
+		} else {
+			left->scope = left->scope_to_destroy;
+			init_dynIR(left, right);
 
-		variable_list_length++;
-		variable_list = realloc(variable_list, variable_list_length * sizeof(variable*));
-		variable_list[variable_list_length - 1] = new_var;
+			variable_list_length++;
+			variable_list = realloc(variable_list, variable_list_length * sizeof(variable*));
+			variable_list[variable_list_length - 1] = left;
+		}
 
-		return new_var;
+		return left;
 	} else if (root->type == '+'){
 		variable* left = evaluate(root->left, high_var, '+');
 		variable* right = evaluate(root->right, high_var, '+');
@@ -1797,7 +1814,6 @@ int main(int argc, char **argv) {
 
   printf("\nPRINTED TREE:\n");
   print_tree(root, 0);
-  printf("\n");
 
   printf("\nPRINTED COMPILER IR:\n");
 evaluate(root, NULL, PROGRAM);
