@@ -11,3 +11,4 @@ My todo list for this project
 <!-- - brackets -->
 <!-- - braces -->
 - Make DynIR
+- Apply tree collection on line 1161 to all priorities
