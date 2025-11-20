@@ -4,12 +4,11 @@
 
 enum token_type;
 struct token_struct;
-char *symbols[] = { // sort by len of symbol
+char *symbols[] = { // sort by len of symbol 
     "bitcast", "sizeof", "cast", "<<=", ">>=", "..", "+=", "-=", "*=",
     "=>",      "/=",     "&=",   "^=",  "|=",  "%=", "||", "&&", "==",
-    "!=",      ">=",     "<=",   "<<",  ">>",  "++", "--", "->"};
+    "!=",      ">=",     "<=",   "<<",  ">>",  "++", "--", "->", "!!"};
 #define LOCAL_LEN(ARR) (sizeof(ARR) / sizeof(ARR[0]))
-
 enum node_type;
 struct node_struct;
 
@@ -1310,7 +1309,34 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
 
     switch (id) {
     case '-':
-    case '+':
+    case '+': {
+      int restore_i = i + 1;
+      i += 2;
+      code_tree_ptr->left->left = malloc(sizeof(node));
+      code_tree_ptr->left->left->type = PROGRAM;
+      code_tree_ptr->left->left->left = malloc(sizeof(node));
+      code_tree_ptr->left->left->right = malloc(sizeof(node));
+      code_tree_ptr->left->left->back = code_tree_ptr->left;
+      code_tree_ptr->left->right = malloc(sizeof(node));
+      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->token_argument = NULL;
+      code_tree_ptr->left->right->back = code_tree_ptr->left;
+
+      int restore_i_minus_i = 1;
+      token *left_token_argument = malloc(sizeof(token));
+      memcpy(left_token_argument, &code_lex[restore_i], sizeof(token));
+
+      code_tree_ptr->left->type = (enum node_type)code_lex[restore_i - 1].type + (int)10000; // means unary operator for + and -
+      code_tree_ptr->left->back = code_tree_ptr;
+
+      tree(code_tree_ptr->left->left, left_token_argument, restore_i_minus_i);
+      code_tree_ptr->right->back = code_tree_ptr;
+      code_tree_ptr->right->left = malloc(sizeof(node));
+      code_tree_ptr->right->right = malloc(sizeof(node));
+      code_tree_ptr->right->type = PROGRAM;
+      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      return;
+    }
     case '!':
     case '@':
     case 'U': {
@@ -2106,6 +2132,106 @@ void plus_equal_dynIR(variable *left, variable *right) {
   }*/
 }
 
+void logor_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("||");
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+  printf("NEW SSA: (BOOL) %s || %s\n", left->name, right->name);
+	else 
+  printf("SSA: (BOOL) %s || %s\n", left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void iter_logor_dynIR(variable *left) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("||") + 1000; // +1000 means iterative
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  	printf("SSA: (BOOL) SSA || %s\n",  left->name);
+}
+
+
+void logand_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("&&");
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+  printf("NEW SSA: (BOOL) %s && %s\n", left->name, right->name);
+	else 
+  printf("SSA: (BOOL) %s && %s\n", left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void general_dynIR(char* symbol, variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+  printf("NEW SSA: (BOOL) %s %s %s\n", left->name, symbol, right->name);
+	else 
+  printf("SSA: (BOOL) %s %s %s\n", left->name, symbol, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void iter_general_dynIR(char* symbol, variable *left, char* paren) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol(symbol) + 1000 ? strlen(symbol) > 1 : symbol[0] + 1000; // +1000 means iterative
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  	printf("SSA:%s SSA %s %s\n", paren, symbol, left->name);
+}
+
+void iter_logand_dynIR(variable *left) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("&&") + 1000; // +1000 means iterative
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  	printf("SSA: (BOOL) SSA && %s\n",  left->name);
+}
+
 variable *evaluate(node *root, variable* high_var, int id) {
 	if (root->type == PROGRAM){
 		variable* to_return = evaluate(root->left, high_var, id);
@@ -2234,7 +2360,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 new_var->name[3] = '\0';
                 strcpy(new_var->name, "SSA");
                 return new_var;
-        }else if (root->type == get_symbol("/=")){
+        } else if (root->type == get_symbol("/=")){
                 variable* left = evaluate(root->left, high_var, get_symbol("/="));
                 variable* right = evaluate(root->right, high_var, get_symbol("/="));
                 div_equal_dynIR(left, right);
@@ -2304,7 +2430,185 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 new_var->name[3] = '\0';
                 strcpy(new_var->name, "SSA");
                 return new_var;
-        }
+        } else if (root->type == get_symbol("||")){
+                variable* left = evaluate(root->left, high_var, get_symbol("||"));
+                variable* right = evaluate(root->right, high_var, get_symbol("||"));
+                if (right == NULL) iter_logor_dynIR(left);
+                else logor_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("&&")){
+                variable* left = evaluate(root->left, high_var, get_symbol("&&"));
+                variable* right = evaluate(root->right, high_var, get_symbol("&&"));
+                if (right == NULL) iter_logand_dynIR(left);
+                else logand_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == '|'){
+                variable* left = evaluate(root->left, high_var, '|');
+                variable* right = evaluate(root->right, high_var, '|');
+                if (right == NULL) iter_general_dynIR("|", left, "");
+                else general_dynIR("|", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == '^'){
+                variable* left = evaluate(root->left, high_var, '^');
+                variable* right = evaluate(root->right, high_var, '^');
+                if (right == NULL) iter_general_dynIR("^", left, "");
+                else general_dynIR("^", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == '&'){
+                variable* left = evaluate(root->left, high_var, '&');
+                variable* right = evaluate(root->right, high_var, '&');
+                if (right == NULL) iter_general_dynIR("&", left, "");
+                else general_dynIR("&", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == '&'){
+                variable* left = evaluate(root->left, high_var, '&');
+                variable* right = evaluate(root->right, high_var, '&');
+                if (right == NULL) iter_general_dynIR("&", left, "");
+                else general_dynIR("&", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("==")){
+                variable* left = evaluate(root->left, high_var, get_symbol("=="));
+                variable* right = evaluate(root->right, high_var, get_symbol("=="));
+                if (right == NULL) iter_general_dynIR("==", left, " (BOOL)");
+                else general_dynIR("==", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("!=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("!="));
+                variable* right = evaluate(root->right, high_var, get_symbol("!="));
+                if (right == NULL) iter_general_dynIR("!=", left, " (BOOL)");
+                else general_dynIR("!=", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol(">=")){
+                variable* left = evaluate(root->left, high_var, get_symbol(">="));
+                variable* right = evaluate(root->right, high_var, get_symbol(">="));
+                if (right == NULL) iter_general_dynIR(">=", left, " (BOOL)");
+                else general_dynIR(">=", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("<=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("<="));
+                variable* right = evaluate(root->right, high_var, get_symbol("<="));
+                if (right == NULL) iter_general_dynIR("<=", left, " (BOOL)");
+                else general_dynIR("<=", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }  else if (root->type == get_symbol("..")){
+                variable* left = evaluate(root->left, high_var, get_symbol(".."));
+                variable* right = evaluate(root->right, high_var, get_symbol(".."));
+                if (right == NULL) iter_general_dynIR("..", left, " (BOOL)");
+                else general_dynIR("..", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == '>'){
+                variable* left = evaluate(root->left, high_var, '>');
+                variable* right = evaluate(root->right, high_var, '>');
+                if (right == NULL) iter_general_dynIR(">", left, " (BOOL)");
+                else general_dynIR(">", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == '<'){
+                variable* left = evaluate(root->left, high_var, '<');
+                variable* right = evaluate(root->right, high_var, '<');
+                if (right == NULL) iter_general_dynIR("<", left, " (BOOL)");
+                else general_dynIR("<", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("<<")){
+                variable* left = evaluate(root->left, high_var, get_symbol("<<"));
+                variable* right = evaluate(root->right, high_var, get_symbol("<<"));
+                if (right == NULL) iter_general_dynIR("<<", left, "");
+                else general_dynIR("<<", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }  else if (root->type == get_symbol(">>")){
+                variable* left = evaluate(root->left, high_var, get_symbol(">>"));
+                variable* right = evaluate(root->right, high_var, get_symbol(">>"));
+                if (right == NULL) iter_general_dynIR(">>", left, "");
+                else general_dynIR(">>", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("!!")){
+                variable* left = evaluate(root->left, high_var, get_symbol("!!"));
+                variable* right = evaluate(root->right, high_var, get_symbol("!!"));
+                if (right == NULL) iter_general_dynIR("!!", left, "");
+                else general_dynIR("!!", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } 
+
+
 
 
 
