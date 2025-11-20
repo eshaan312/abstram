@@ -2187,7 +2187,27 @@ void logand_dynIR(variable *left, variable *right) {
   }*/
 }
 
-void general_dynIR(char* symbol, variable *left, variable *right) {
+void unary_dynIR(char* symbol, variable *left, char* paren) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+	if (strcmp(left->name, "SSA") != 0 )
+  printf("NEW SSA:%s %s %s\n",paren, symbol, left->name);
+	else 
+  printf("SSA:%s %s %s\n",paren, symbol, left->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void general_dynIR(char* symbol, variable *left, variable *right, char* paren) {
 	instruction* new_assignment = malloc(sizeof(instruction));
 	new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
 	new_assignment->args = malloc(sizeof(variable*) * 2);
@@ -2198,9 +2218,9 @@ void general_dynIR(char* symbol, variable *left, variable *right) {
 	program = realloc(program, sizeof(instruction*) * (program_length));
 	program[program_length - 1] = new_assignment;
 	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: (BOOL) %s %s %s\n", left->name, symbol, right->name);
+  printf("NEW SSA:%s %s %s %s\n", paren, left->name, symbol, right->name);
 	else 
-  printf("SSA: (BOOL) %s %s %s\n", left->name, symbol, right->name);
+  printf("SSA:%s %s %s %s\n", paren, left->name, symbol, right->name);
  /* int i = program_length - 2;
   while (i >= 0 && program[i]->id >= 1000){
   	printf("SSA: SSA + %s\n", left->name);
@@ -2456,7 +2476,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, '|');
                 variable* right = evaluate(root->right, high_var, '|');
                 if (right == NULL) iter_general_dynIR("|", left, "");
-                else general_dynIR("|", left, right);
+                else general_dynIR("|", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2467,7 +2487,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, '^');
                 variable* right = evaluate(root->right, high_var, '^');
                 if (right == NULL) iter_general_dynIR("^", left, "");
-                else general_dynIR("^", left, right);
+                else general_dynIR("^", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2478,18 +2498,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, '&');
                 variable* right = evaluate(root->right, high_var, '&');
                 if (right == NULL) iter_general_dynIR("&", left, "");
-                else general_dynIR("&", left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == '&'){
-                variable* left = evaluate(root->left, high_var, '&');
-                variable* right = evaluate(root->right, high_var, '&');
-                if (right == NULL) iter_general_dynIR("&", left, "");
-                else general_dynIR("&", left, right);
+                else general_dynIR("&", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2500,7 +2509,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol("=="));
                 variable* right = evaluate(root->right, high_var, get_symbol("=="));
                 if (right == NULL) iter_general_dynIR("==", left, " (BOOL)");
-                else general_dynIR("==", left, right);
+                else general_dynIR("==", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2511,7 +2520,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol("!="));
                 variable* right = evaluate(root->right, high_var, get_symbol("!="));
                 if (right == NULL) iter_general_dynIR("!=", left, " (BOOL)");
-                else general_dynIR("!=", left, right);
+                else general_dynIR("!=", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2522,7 +2531,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol(">="));
                 variable* right = evaluate(root->right, high_var, get_symbol(">="));
                 if (right == NULL) iter_general_dynIR(">=", left, " (BOOL)");
-                else general_dynIR(">=", left, right);
+                else general_dynIR(">=", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2533,7 +2542,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol("<="));
                 variable* right = evaluate(root->right, high_var, get_symbol("<="));
                 if (right == NULL) iter_general_dynIR("<=", left, " (BOOL)");
-                else general_dynIR("<=", left, right);
+                else general_dynIR("<=", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2544,7 +2553,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol(".."));
                 variable* right = evaluate(root->right, high_var, get_symbol(".."));
                 if (right == NULL) iter_general_dynIR("..", left, " (BOOL)");
-                else general_dynIR("..", left, right);
+                else general_dynIR("..", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2555,7 +2564,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, '>');
                 variable* right = evaluate(root->right, high_var, '>');
                 if (right == NULL) iter_general_dynIR(">", left, " (BOOL)");
-                else general_dynIR(">", left, right);
+                else general_dynIR(">", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2566,7 +2575,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, '<');
                 variable* right = evaluate(root->right, high_var, '<');
                 if (right == NULL) iter_general_dynIR("<", left, " (BOOL)");
-                else general_dynIR("<", left, right);
+                else general_dynIR("<", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2577,7 +2586,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol("<<"));
                 variable* right = evaluate(root->right, high_var, get_symbol("<<"));
                 if (right == NULL) iter_general_dynIR("<<", left, "");
-                else general_dynIR("<<", left, right);
+                else general_dynIR("<<", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2588,7 +2597,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol(">>"));
                 variable* right = evaluate(root->right, high_var, get_symbol(">>"));
                 if (right == NULL) iter_general_dynIR(">>", left, "");
-                else general_dynIR(">>", left, right);
+                else general_dynIR(">>", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2597,20 +2606,19 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 return new_var;
         } else if (root->type == get_symbol("!!")){
                 variable* left = evaluate(root->left, high_var, get_symbol("!!"));
-                variable* right = evaluate(root->right, high_var, get_symbol("!!"));
-                if (right == NULL) iter_general_dynIR("!!", left, "");
-                else general_dynIR("!!", left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("cast")){
+		unary_dynIR("!!", left, " (BOOL)");
+		// NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS ALREADY INPUTTED IF NECESSARY
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
+
+	} else if (root->type == get_symbol("cast")){
                 variable* left = evaluate(root->left, high_var, get_symbol("cast"));
                 variable* right = evaluate(root->right, high_var, get_symbol("cast"));
                 if (right == NULL) iter_general_dynIR("cast", left, "");
-                else general_dynIR("cast", left, right);
+                else general_dynIR("cast", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2621,7 +2629,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol("bitcast"));
                 variable* right = evaluate(root->right, high_var, get_symbol("bitcast"));
                 if (right == NULL) iter_general_dynIR("bitcast", left, "");
-                else general_dynIR("bitcast", left, right);
+                else general_dynIR("bitcast", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2632,7 +2640,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
                 variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
                 if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                else general_dynIR("sizeof", left, right);
+                else general_dynIR("sizeof", left, right, "");
                      
                 variable* new_var = malloc(sizeof(variable));
                 new_var->name = malloc(4);
@@ -2640,16 +2648,14 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 strcpy(new_var->name, "SSA");
                 return new_var;
         } else if (root->type == '+' + 1000){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
+                variable* left = evaluate(root->left, high_var, '+' + 1000);
+		unary_dynIR("!!", left, "");
+		// NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS ALREADY INPUTTED IF NECESSARY
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
         } else if (root->type == '-' + 1000){
                 // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
                 // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
