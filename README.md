@@ -20,9 +20,6 @@
   - **TL;DR:** Dependency-checking lets you mostly treat the language like it's garbage-collected, even though it isn't.
 
 - **Potential concerns:**
-  - If 'A' owns 'B', 'B' owns 'C', and 'C' owns 'A', what will happen?    
-    - All 3 will be freed at the highest lifetime value in the group. So if 'C' has global scope and both 'A' and 'B' have local scopes, both 'A' and 'B' will recieve extended lifetimes to match 'C'. 
-           
   - If a function runs a complex calculation to determine if it'll make a heap allocation, how do you know if it's ends up being made or not, and when to free it?    
     - In these situations, a static array is created for the scope, and at the end of the scope, it'll loop through the array and free all addresses inside it (this process has the same runtime cost as its typical implementation in memory-unsafe languages). If no potential heap allocations are detected, neither the static array or the loop will exist in the resulting compilation.
           
