@@ -1521,7 +1521,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->right->right = malloc(sizeof(node));
           code_tree_ptr->left->right->left = malloc(sizeof(node));
 
-          code_tree_ptr->left->type = (enum node_type)BRACK_PAREN;
+          code_tree_ptr->left->type = (enum node_type)BRACK_PAREN_WORD;
           code_tree_ptr->left->back = code_tree_ptr;
 
           tree(code_tree_ptr->left->left, code_lex[i].token_argument,
@@ -1556,7 +1556,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->right->right = malloc(sizeof(node));
           code_tree_ptr->left->right->left = malloc(sizeof(node));
 
-          code_tree_ptr->left->type = (enum node_type)BRACE_PAREN;
+          code_tree_ptr->left->type = (enum node_type)BRACE_PAREN_WORD;
           code_tree_ptr->left->back = code_tree_ptr;
 
           tree(code_tree_ptr->left->left, code_lex[i].token_argument,
@@ -1588,7 +1588,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->right->token_argument = NULL;
           code_tree_ptr->left->right->back = code_tree_ptr->left;
 
-          code_tree_ptr->left->type = (enum node_type)'(';
+          code_tree_ptr->left->type = (enum node_type)PAREN_WORD;
           code_tree_ptr->left->back = code_tree_ptr;
 
           tree(code_tree_ptr->left->left, code_lex[i].token_argument,
@@ -1616,7 +1616,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->right->token_argument = NULL;
           code_tree_ptr->left->right->back = code_tree_ptr->left;
 
-          code_tree_ptr->left->type = (enum node_type)'[';
+          code_tree_ptr->left->type = (enum node_type)BRACK_WORD;
           code_tree_ptr->left->back = code_tree_ptr;
 
           tree(code_tree_ptr->left->left, code_lex[i].brack_argument,
@@ -1644,7 +1644,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
           code_tree_ptr->left->right->token_argument = NULL;
           code_tree_ptr->left->right->back = code_tree_ptr->left;
 
-          code_tree_ptr->left->type = (enum node_type)'{';
+          code_tree_ptr->left->type = (enum node_type)BRACE_WORD;
           code_tree_ptr->left->back = code_tree_ptr;
 
           tree(code_tree_ptr->left->left, code_lex[i].brace_argument,
@@ -2187,6 +2187,25 @@ void logand_dynIR(variable *left, variable *right) {
   }*/
 }
 
+void displaced_unary_dynIR(int disp, char* symbol, variable *left, char* paren) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol(symbol) + disp ? strlen(symbol) > 1 : symbol[0] + disp;
+	new_assignment->args = malloc(sizeof(variable*) * 1);
+	new_assignment->args[0] = left;
+	new_assignment->args_len = 1;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+	if (strcmp(left->name, "SSA") != 0 )
+  printf("NEW SSA:%s %s %s\n",paren, symbol, left->name);
+	else 
+  printf("SSA:%s %s %s\n",paren, symbol, left->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
 void unary_dynIR(char* symbol, variable *left, char* paren) {
 	instruction* new_assignment = malloc(sizeof(instruction));
 	new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
@@ -2647,81 +2666,55 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 new_var->name[3] = '\0';
                 strcpy(new_var->name, "SSA");
                 return new_var;
-        } else if (root->type == '+' + 1000){
-                variable* left = evaluate(root->left, high_var, '+' + 1000);
-		unary_dynIR("!!", left, "");
+        } else if (root->type == '+' + 10000){
+                variable* left = evaluate(root->left, high_var, '+' + 10000);
+		displaced_unary_dynIR(10000, "+", left, "");
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
+        } else if (root->type == '-' + 10000){
+                variable* left = evaluate(root->left, high_var, '-' + 10000);
+		displaced_unary_dynIR(10000, "-", left, "");
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
+        } else if (root->type == '!'){
+                variable* left = evaluate(root->left, high_var, '!');
+		unary_dynIR("!", left, " (BOOL)");
 		// NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS ALREADY INPUTTED IF NECESSARY
 		variable* new_var = malloc(sizeof(variable));
 		new_var->name = malloc(4);
 		new_var->name[3] = '\0';
 		strcpy(new_var->name, "SSA");
 		return new_var;
-        } else if (root->type == '-' + 1000){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
-        } else if (root->type == '!'){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
         } else if (root->type == '@'){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
-        } else if (root->type == '!'){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
+                variable* left = evaluate(root->left, high_var, '@');
+		unary_dynIR("@", left, "");
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
         }  else if (root->type == get_symbol("++")){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
+                variable* left = evaluate(root->left, high_var, get_symbol("++"));
+		unary_dynIR("++", left, "");
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
         }else if (root->type == get_symbol("--")){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
+                variable* left = evaluate(root->left, high_var, get_symbol("--"));
+		unary_dynIR("--", left, "");
+		variable* new_var = malloc(sizeof(variable));
+		new_var->name = malloc(4);
+		new_var->name[3] = '\0';
+		strcpy(new_var->name, "SSA");
+		return new_var;
         }else if (root->type == '('){
                 // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
                 // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
