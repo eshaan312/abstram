@@ -2606,6 +2606,94 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 new_var->name[3] = '\0';
                 strcpy(new_var->name, "SSA");
                 return new_var;
+        } else if (root->type == get_symbol("cast")){
+                variable* left = evaluate(root->left, high_var, get_symbol("cast"));
+                variable* right = evaluate(root->right, high_var, get_symbol("cast"));
+                if (right == NULL) iter_general_dynIR("cast", left, "");
+                else general_dynIR("cast", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("bitcast")){
+                variable* left = evaluate(root->left, high_var, get_symbol("bitcast"));
+                variable* right = evaluate(root->right, high_var, get_symbol("bitcast"));
+                if (right == NULL) iter_general_dynIR("bitcast", left, "");
+                else general_dynIR("bitcast", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == get_symbol("sizeof")){
+                variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+                variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+                if (right == NULL) iter_general_dynIR("sizeof", left, "");
+                else general_dynIR("sizeof", left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        } else if (root->type == '+' + 1000){
+                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+                // else general_dynIR("sizeof", left, right);
+                     
+                // variable* new_var = malloc(sizeof(variable));
+                // new_var->name = malloc(4);
+                // new_var->name[3] = '\0';
+                // strcpy(new_var->name, "SSA");
+                // return new_var;
+        } else if (root->type == '-' + 1000){
+                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+                // else general_dynIR("sizeof", left, right);
+                     
+                // variable* new_var = malloc(sizeof(variable));
+                // new_var->name = malloc(4);
+                // new_var->name[3] = '\0';
+                // strcpy(new_var->name, "SSA");
+                // return new_var;
+        } else if (root->type == '!'){
+                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+                // else general_dynIR("sizeof", left, right);
+                     
+                // variable* new_var = malloc(sizeof(variable));
+                // new_var->name = malloc(4);
+                // new_var->name[3] = '\0';
+                // strcpy(new_var->name, "SSA");
+                // return new_var;
+        } else if (root->type == '@'){
+                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+                // else general_dynIR("sizeof", left, right);
+                     
+                // variable* new_var = malloc(sizeof(variable));
+                // new_var->name = malloc(4);
+                // new_var->name[3] = '\0';
+                // strcpy(new_var->name, "SSA");
+                // return new_var;
+        } else if (root->type == '!'){
+                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+                // else general_dynIR("sizeof", left, right);
+                     
+                // variable* new_var = malloc(sizeof(variable));
+                // new_var->name = malloc(4);
+                // new_var->name[3] = '\0';
+                // strcpy(new_var->name, "SSA");
+                // return new_var;
         } 
 
 
