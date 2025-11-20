@@ -2,6 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ok so heres the plan to handle the parenthesis situation:
+- make a different append token function for specifically parenthesis
+- rewrite the parenthesis tokenizer and the parenthesis tree creator to follow the new conventions
+- fix everything for brackets
+- basically the goal is to make the amount of parenthesis, brackets, etc. you can add to an argument to make it very easy to use 
+
+
+- interoperability in C isn't checked for safety. you just use a function signature and you can say in the function signature what will be dependent on what, which can guarantee safety if done correctly.
+*/
+
 enum token_type;
 struct token_struct;
 char *symbols[] = { // sort by len of symbol 
@@ -31,15 +42,26 @@ typedef struct token_struct {
   enum token_type type;
   char *string_argument;
 
-  struct token_struct *token_argument;
-  struct token_struct *colon_argument;
-  struct token_struct *brace_argument;
-  struct token_struct *brack_argument;
+  struct token_struct **token_argument;
+  struct token_struct **paren_argument;
+  struct token_struct **colon_argument;
+  struct token_struct **brace_argument;
+  struct token_struct **brack_argument;
 
-  size_t token_length;
-  size_t colon_length;
-  size_t brace_length;
-  size_t brack_length;
+  size_t* token_lengths;
+  size_t token_lengths_length;
+
+  size_t* paren_lengths;
+  size_t paren_lengths_length;
+
+  size_t* colon_lengths;
+  size_t paren_lengths_length;
+
+  size_t* brace_lengths;
+  size_t brace_lengths_length;
+
+  size_t* brack_lengths;
+  size_t brack_lengths_length;
 } token;
 
 typedef struct node_struct {
@@ -235,7 +257,6 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
                                  code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
         append_token(&code_lex, &code_lex_size, &code_lex_index, WORD,
@@ -271,7 +292,6 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
                                  code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
         append_token_b(&code_lex, &code_lex_size, &code_lex_index, WORD,
@@ -307,7 +327,6 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
                                  code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == ':' ||
                                  code_lex[code_lex_index - 1].type == '[')) {
         code_lex_index--;
         append_token_bk(&code_lex, &code_lex_size, &code_lex_index, WORD,
