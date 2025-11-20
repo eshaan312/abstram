@@ -11,3 +11,7 @@ My todo list for this project
 <!-- - brackets -->
 <!-- - braces -->
 - Make DynIR
+
+
+some info about interoperability:
+- do this
