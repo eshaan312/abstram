@@ -58,7 +58,7 @@ typedef struct variable_struct {
   char *type;
   int memtype; // stack=0, heap=1, SSA=2
   int scope;
-  size_t scope_to_destroy;
+  int* scope_to_destroy;
 } variable;
 
 variable **variable_list;
@@ -461,64 +461,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     int id = code_lex[i].type;
 
     switch (id) {
-    case ',':;
-      int restore_i = i;
-      i--;
-      while (i != -1 && code_lex[i].type != ',') {
-        i--;
-      }
-
-      i++;
-      code_tree_ptr->left->left = malloc(sizeof(node));
-      code_tree_ptr->left->left->type = PROGRAM;
-      code_tree_ptr->left->left->left = malloc(sizeof(node));
-      code_tree_ptr->left->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->left->back = code_tree_ptr->left;
-      code_tree_ptr->left->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->type = PROGRAM;
-      code_tree_ptr->left->right->back = code_tree_ptr->left;
-      code_tree_ptr->left->right->right = malloc(sizeof(node));
-      code_tree_ptr->left->right->left = malloc(sizeof(node));
-
-      int restore_i_minus_i = restore_i - i;
-      token *left_token_argument = malloc(sizeof(token) * restore_i_minus_i);
-      memcpy(left_token_argument, &code_lex[i],
-             sizeof(token) * restore_i_minus_i);
-
-      i = restore_i;
-      i++;
-      while (i != code_lex_index && code_lex[i].type != ',') {
-        i++;
-      }
-
-      int i_minus_restore_i = i - restore_i - 1;
-      token *right_token_argument = malloc(sizeof(token) * (i_minus_restore_i));
-      memcpy(right_token_argument, &code_lex[restore_i + 1],
-             sizeof(token) * (i_minus_restore_i));
-
-      code_tree_ptr->left->type = (enum node_type)code_lex[restore_i].type;
-      code_tree_ptr->left->back = code_tree_ptr;
-
-      tree(code_tree_ptr->left->left, left_token_argument, restore_i_minus_i);
-      tree(code_tree_ptr->left->right, right_token_argument, i_minus_restore_i);
-
-      code_tree_ptr->right->back = code_tree_ptr;
-      code_tree_ptr->right->left = malloc(sizeof(node));
-      code_tree_ptr->right->right = malloc(sizeof(node));
-      code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-      if (code_lex[i].type == ','){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
-      } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
-      }
-      return;
+    case ',':
     default:
       break;
     }
@@ -1983,6 +1926,185 @@ void iter_add_dynIR(variable *left) {
   	printf("SSA: SSA + %s\n", left->name);
 }
 
+void minus_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("-="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s - %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void mul_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("*="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s * %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void div_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("/="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s / %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void mod_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("%="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s %c %s\n", left->name, left->name, '%', right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+void shleft_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("<<="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s << %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void shright_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol(">>="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s >> %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void or_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("|="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s | %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+
+void xor_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("^="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s ^ %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void and_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("&="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s & %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
+
+void plus_equal_dynIR(variable *left, variable *right) {
+	instruction* new_assignment = malloc(sizeof(instruction));
+	new_assignment->id = get_symbol("+="); 
+	new_assignment->args = malloc(sizeof(variable*) * 2);
+	new_assignment->args[0] = left;
+	new_assignment->args[1] = right;
+	new_assignment->args_len = 2;
+	program_length++;
+	program = realloc(program, sizeof(instruction*) * (program_length));
+	program[program_length - 1] = new_assignment;
+  printf("ASSIGN: %s = %s + %s\n", left->name, left->name, right->name);
+ /* int i = program_length - 2;
+  while (i >= 0 && program[i]->id >= 1000){
+  	printf("SSA: SSA + %s\n", left->name);
+	i--;
+  }*/
+}
 
 variable *evaluate(node *root, variable* high_var, int id) {
 	if (root->type == PROGRAM){
@@ -1994,16 +2116,16 @@ variable *evaluate(node *root, variable* high_var, int id) {
 		new_var->name = root->token_argument->string_argument;
 		if (root->token_argument->type == WORD){
 			for (int i = 0; i < variable_list_length; i++){
-				if (high_var != NULL && strcmp(variable_list[i]->name, new_var->name) == 0 && variable_list[i]->memtype == 1 && variable_list[i]->scope_to_destroy < high_var->scope_to_destroy){
-					variable_list[i]->scope_to_destroy = high_var->scope_to_destroy;
+				if (high_var != NULL && strcmp(variable_list[i]->name, new_var->name) == 0 && variable_list[i]->memtype == 1 && *(variable_list[i]->scope_to_destroy) < *(high_var->scope_to_destroy)){
+					variable_list[i]->scope_to_destroy = (high_var->scope_to_destroy);
 				} // basically, when inserting frees at the end, check the scope_to_destroy to see when to actually free the variable. however, the actual scope is the actual scope its defined in so errors can work.
 				else if (strcmp(variable_list[i]->name, new_var->name) == 0) return (variable_list[i]);
 			}
 
 			if (id == '='){
 				new_var->scope = -1;
-				new_var->scope_to_destroy = scope;
-
+				new_var->scope_to_destroy = malloc(sizeof(int));
+				*(new_var->scope_to_destroy) = scope; 
 			// ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
 			}
 		}
@@ -2016,7 +2138,7 @@ variable *evaluate(node *root, variable* high_var, int id) {
 		if (left->scope != -1){
 			assign_dynIR(left, right);
 		} else {
-			left->scope = left->scope_to_destroy;
+			left->scope = *(left->scope_to_destroy);
 			init_dynIR(left, right);
 
 			variable_list_length++;
@@ -2082,7 +2204,112 @@ variable *evaluate(node *root, variable* high_var, int id) {
                 new_var->name[3] = '\0';
                 strcpy(new_var->name, "SSA");
                 return new_var;
+        } else if (root->type == get_symbol("+=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("+="));
+                variable* right = evaluate(root->right, high_var, get_symbol("+="));
+                plus_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("-=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("-="));
+                variable* right = evaluate(root->right, high_var, get_symbol("-="));
+                minus_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("*=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("*="));
+                variable* right = evaluate(root->right, high_var, get_symbol("*="));
+                mul_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("/=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("/="));
+                variable* right = evaluate(root->right, high_var, get_symbol("/="));
+                div_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("%=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("%="));
+                variable* right = evaluate(root->right, high_var, get_symbol("%="));
+                mod_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("<<=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("<<="));
+                variable* right = evaluate(root->right, high_var, get_symbol("<<="));
+                shleft_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol(">>=")){
+                variable* left = evaluate(root->left, high_var, get_symbol(">>="));
+                variable* right = evaluate(root->right, high_var, get_symbol(">>="));
+                shright_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("&=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("&="));
+                variable* right = evaluate(root->right, high_var, get_symbol("&="));
+                and_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("^=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("^="));
+                variable* right = evaluate(root->right, high_var, get_symbol("^="));
+                xor_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
+        }else if (root->type == get_symbol("|=")){
+                variable* left = evaluate(root->left, high_var, get_symbol("|="));
+                variable* right = evaluate(root->right, high_var, get_symbol("|="));
+                or_equal_dynIR(left, right);
+                     
+                variable* new_var = malloc(sizeof(variable));
+                new_var->name = malloc(4);
+                new_var->name[3] = '\0';
+                strcpy(new_var->name, "SSA");
+                return new_var;
         }
+
+
+
+
+
 }
 
 int main(int argc, char **argv) {
