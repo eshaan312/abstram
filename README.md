@@ -16,7 +16,7 @@
   - Sometimes developers can accidentally change the lifetimes of heap allocations even when they didn't mean to, which can result in a potentially massive runtime cost.
     - Therefore, every time a lifetime is changed, the developer needs to use the `sign` keyword which takes two arguments: the maximum amount of blocks on the heap that'll be given raised lifetimes, and the higher-scope variable that depends on the heap allocation.
     - Clarification: signs don't actually do anything at runtime. They don't give the user control over memory management or lifetimes: they're just an acknowledgement of the cost of raising the lifetime of a heap allocation. If the developer finds that cost to be too high, the sign helps them realize that they need to change something in their program. 
-    - This feature is only used for compile-time confirmation and can be turned off when you compile using the `--no-sign` flag.
+    - This feature is only used for compile-time confirmation and can be turned off when you compile using the `--no-sign` flag (the resulting executable will be the exact same without signs).
     - When you compile your code and the compiler realizes that you forgot to sign an allocation, it'll tell you exactly where to put the sign and what arguments to sign it with
            
   - **TL;DR:** Dependency-checking lets you mostly treat the language like it's garbage-collected, even though it isn't.
