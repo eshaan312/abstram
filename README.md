@@ -12,6 +12,7 @@
   - Nisse's main feature is memory-safety using region inference.
     - At compile-time, each heap-allocated data structure in this language has a value that tells the compiler what point it needs to be freed at (AKA the lifetime).
     - By default, this value is set to the point that all dependent data stops being accessed in the scope it was defined in, but when you, for example, assign the value to a global array that's accessed right before the the main function returns, it'll end up being freed at the end of the program.
+    - You can also drop a heap allocation manually, which would tell the compiler that there is a 0% chance of that allocation getting referenced later on. If this is obviously not true (e.g. when you reference a variable right after dropping it) you'll get a compile-time error, but if nothing that directly depends on the dropped allocation is called after the drop, there will be no error. This should only be used if you're extremely confident since it would result in a UAF error at runtime. If you don't drop the allocation, the allocation will exist until all dependencies are settled. 
            
   - Sometimes developers can accidentally change the lifetimes of heap allocations even when they didn't mean to, which can result in a potentially massive runtime cost.
     - Therefore, every time a lifetime is changed, the developer needs to use the `sign` keyword which takes two arguments: the maximum amount of blocks on the heap that'll be given raised lifetimes, and the higher-scope variable that depends on the heap allocation.
