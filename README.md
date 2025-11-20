@@ -14,8 +14,9 @@
     - By default, this value is set to the point that all dependent data stops being accessed in the scope it was defined in, but when you, for example, assign the value to a global array that's accessed right before the the main function returns, it'll end up being freed at the end of the program.
            
   - Sometimes developers can accidentally change the lifetimes of heap allocations even when they didn't mean to, which can result in a potentially massive runtime cost.
-    - Therefore, every time a lifetime is changed, the developer needs to use the `sign` keyword which takes two arguments: the amount of blocks on the heap that'll be given raised lifetimes, and the higher-scope variable that depends on the heap allocation.
-    - This feature is only used for compile-time confirmation and can be turned off when you compile using the `--no-sign` flag.
+    - Therefore, every time a lifetime is changed, the developer needs to use the `sign` keyword which takes two arguments: the maximum amount of blocks on the heap that'll be given raised lifetimes, and the higher-scope variable that depends on the heap allocation.
+    - This feature is only used for compile-time confirmation (signs only exist to make sure developers understand exactly what they're doing) and can be turned off when you compile using the `--no-sign` flag.
+    - When you compile your code and the compiler realizes that you forgot to sign an allocation, it'll tell you exactly where to put the sign and what arguments to sign it with
            
   - **TL;DR:** Dependency-checking lets you mostly treat the language like it's garbage-collected, even though it isn't.
 
