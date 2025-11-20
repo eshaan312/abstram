@@ -1,5 +1,5 @@
 <p align="center">
-<img width="200" height="230" alt="image" src="https://xmm16.github.io/nisse.png" />
+<img width="230" height="250" alt="image" src="https://xmm16.github.io/nisse.png" />
 </p>
 <p align="center"><b>Nisse</b> - a convenient systems programming language<br></p>
 
