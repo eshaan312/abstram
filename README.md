@@ -12,11 +12,17 @@
   - Nisse's main feature is memory-safety using region inference.
     - At compile-time, each heap-allocated data structure in this language has a value that tells the compiler what point it needs to be freed at (AKA the lifetime).
     - By default, this value is set to the point that all dependent data stops being accessed in the scope it was defined in, but when you, for example, assign the value to a global array that's accessed right before the the main function returns, it'll end up being freed at the end of the program.
-    - You can also drop a heap allocation manually, which would tell the compiler that there is a 0% chance of that allocation getting referenced later on. If this is obviously not true (e.g. when you reference a variable right after dropping it) you'll get a compile-time error, but if nothing that directly depends on the dropped allocation is called after the drop, there will be no error. This should only be used if you're extremely confident since it would result in a UAF error at runtime. If you don't drop the allocation, the allocation will exist until all dependencies are settled. 
+           
+  - You can also drop a heap allocation manually, which would tell the compiler that there is a 0% chance of that allocation getting referenced later on.
+    - If this is obviously not true (e.g. when you reference a variable right after dropping it) you'll get a compile-time error, but if nothing that depends on the dropped allocation is used after the drop, there will be no error.
+    - You should only drop if you're extremely confident since it would result in a UAF error at runtime if you're wrong. If you don't drop the allocation, it'll exist until all dependencies are thoroughly settled.
            
   - Sometimes developers can accidentally change the lifetimes of heap allocations even when they didn't mean to, which can result in a potentially massive runtime cost.
     - Therefore, every time a lifetime is changed, the developer needs to use the `sign` keyword which takes two arguments: the maximum amount of blocks on the heap that'll be given raised lifetimes, and the higher-scope variable that depends on the heap allocation.
-    - Clarification: signs don't actually do anything at runtime. They don't give the user control over memory management or lifetimes: they're just an acknowledgement of the cost of raising the lifetime of a heap allocation. If the developer finds that cost to be too high, the sign helps them realize that they need to change something in their program. 
+    - Clarification: signs don't actually do anything at runtime.
+            
+      - They don't give the user control over memory management or lifetimes: they're just an acknowledgement of the cost of raising the lifetime of a heap allocation.
+      - If the developer finds that cost to be too high, the sign helps them realize that they need to change something in their program. 
     - This feature is only used for compile-time confirmation and can be turned off when you compile using the `--no-sign` flag (the resulting executable will be the exact same without signs).
     - When you compile your code and the compiler realizes that you forgot to sign an allocation, it'll tell you exactly where to put the sign and what arguments to sign it with
            
