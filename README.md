@@ -7,8 +7,8 @@
 - However, Nisse adds a few things that I think will make code easier to read and more enjoyable to write.
 
 #### Memory:
-- **Region inference:**
-  - Nisse's main feature is memory-safety using region inference.
+- **Lifetime inference:**
+  - Nisse's main feature is memory-safety using lifetime inference.
     - At compile-time, each heap-allocated data structure in this language has a value that tells the compiler what point it needs to be freed at (AKA the lifetime).
     - By default, this value is set to the point that all dependent data stops being accessed in the scope it was defined in, but when you, for example, assign the value to a global array that's accessed right before the the main function returns, it'll end up being freed at the end of the program.
            
