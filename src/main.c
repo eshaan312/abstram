@@ -121,8 +121,6 @@ void append_token_c(token **code_lex, int *code_lex_size, int *code_lex_index,
     (*code_lex)[(*code_lex_index)].type = HYBRID;
   }
 
-  else
-    (*code_lex)[(*code_lex_index)].type = type;
   (*code_lex)[(*code_lex_index)].string_argument = string_argument;
 
   (*code_lex)[(*code_lex_index)].colon_lengths_length++;
@@ -171,8 +169,7 @@ void append_token_b(token **code_lex, int *code_lex_size, int *code_lex_index,
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
 
     (*code_lex)[(*code_lex_index)].type = HYBRID;
-  } else
-    (*code_lex)[(*code_lex_index)].type = type;
+  }
 
   int old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
   (*code_lex)[(*code_lex_index)].order =
@@ -227,9 +224,7 @@ void append_token_bk(token **code_lex, int *code_lex_size, int *code_lex_index,
     (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
     (*code_lex)[(*code_lex_index)].type = HYBRID;
-  } else
-    (*code_lex)[(*code_lex_index)].type = type;
-
+  }
   int old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
   (*code_lex)[(*code_lex_index)].order =
       realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
@@ -282,9 +277,7 @@ void append_token_p(token **code_lex, int *code_lex_size, int *code_lex_index,
     (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
     (*code_lex)[(*code_lex_index)].type = HYBRID;
-  } else
-    (*code_lex)[(*code_lex_index)].type = type;
-
+  }
   int old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
   (*code_lex)[(*code_lex_index)].order =
       realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
@@ -3039,9 +3032,6 @@ variable *evaluate(node *root, variable *high_var, int id) {
     strcpy(new_var->name, "SSA");
     return new_var;
   } else if (root->type == '(') {
-    variable *to_return = evaluate(root->left, high_var, id);
-    evaluate(root->right, high_var, id);
-    return to_return;
   } else if (root->type == '[') {
 
     // this just by itself probably isnt gonna happen but i'll keep it in the
@@ -3065,6 +3055,17 @@ variable *evaluate(node *root, variable *high_var, int id) {
     // return new_var;
 
   } else if (root->type == HYBRID_N) {
+    if (root->right->type == END) {
+      switch (root->left->type) { // why did i make this like this???
+                                  // ive asked that question about every single
+                                  // line of code on this project
+      case '(': {
+        variable *to_return = evaluate(root->left->left, high_var, id);
+        evaluate(root->left->right, high_var, id);
+        return to_return;
+      }
+      }
+    }
     // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
     // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
     // if (right == NULL) iter_general_dynIR("sizeof", left, "");
