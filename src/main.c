@@ -3,16 +3,8 @@
 #include <string.h>
 
 /*
-ok so heres the plan to handle the parenthesis situation:
-- make a different append token function for specifically parenthesis
-- rewrite the parenthesis tokenizer and the parenthesis tree creator to follow
-the new conventions
-- fix everything for brackets
-- basically the goal is to make the amount of parenthesis, brackets, etc. you
-can add to an argument to make it very easy to use
-
-
-- interoperability in C isn't checked for safety. you just use a function
+random notes:
+   - interoperability in C isn't checked for safety. you just use a function
 signature and you can say in the function signature what will be dependent on
 what, which can guarantee safety if done correctly.
 */
@@ -52,19 +44,19 @@ typedef struct token_struct {
   struct token_struct **brace_argument;
   struct token_struct **brack_argument;
 
-  size_t token_length;
+  int token_length;
 
-  size_t *paren_lengths;
-  size_t paren_lengths_length;
+  int *paren_lengths;
+  int paren_lengths_length;
 
-  size_t *colon_lengths;
-  size_t colon_lengths_length;
+  int *colon_lengths;
+  int colon_lengths_length;
 
-  size_t *brace_lengths;
-  size_t brace_lengths_length;
+  int *brace_lengths;
+  int brace_lengths_length;
 
-  size_t *brack_lengths;
-  size_t brack_lengths_length;
+  int *brack_lengths;
+  int brack_lengths_length;
 
   char *order; // order that they were attached to the data "({[(([{("
 } token;
@@ -88,22 +80,21 @@ typedef struct variable_struct {
 } variable;
 
 variable **variable_list;
-size_t variable_list_length;
+int variable_list_length;
 
 typedef struct instruction_struct {
   int id;
-  size_t args_len;
+  int args_len;
   variable **args;
 } instruction;
 
 instruction **program;
-size_t program_length;
-size_t scope;
+int program_length;
+int scope;
 
-void append_token_c(token **code_lex, size_t *code_lex_size,
-                    size_t *code_lex_index, enum token_type type,
-                    char *string_argument, token *token_argument,
-                    int length_token_argument) {
+void append_token_c(token **code_lex, int *code_lex_size, int *code_lex_index,
+                    enum token_type type, char *string_argument,
+                    token *token_argument, int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
@@ -112,19 +103,19 @@ void append_token_c(token **code_lex, size_t *code_lex_size,
   if (type != HYBRID) {
     (*code_lex)[(*code_lex_index)].order = malloc(1);
     (*code_lex)[(*code_lex_index)].order[0] = '\0';
-    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
     (*code_lex)[(*code_lex_index)].type = HYBRID;
@@ -137,7 +128,7 @@ void append_token_c(token **code_lex, size_t *code_lex_size,
   (*code_lex)[(*code_lex_index)].colon_lengths_length++;
   (*code_lex)[(*code_lex_index)].colon_lengths = realloc(
       (*code_lex)[(*code_lex_index)].colon_lengths,
-      (*code_lex)[(*code_lex_index)].colon_lengths_length * sizeof(size_t));
+      (*code_lex)[(*code_lex_index)].colon_lengths_length * sizeof(int));
   (*code_lex)[(*code_lex_index)]
       .colon_lengths[(*code_lex)[(*code_lex_index)].colon_lengths_length - 1] =
       length_token_argument;
@@ -152,10 +143,9 @@ void append_token_c(token **code_lex, size_t *code_lex_size,
   (*code_lex_index)++;
 }
 
-void append_token_b(token **code_lex, size_t *code_lex_size,
-                    size_t *code_lex_index, enum token_type type,
-                    char *string_argument, token *token_argument,
-                    int length_token_argument) {
+void append_token_b(token **code_lex, int *code_lex_size, int *code_lex_index,
+                    enum token_type type, char *string_argument,
+                    token *token_argument, int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
@@ -164,19 +154,19 @@ void append_token_b(token **code_lex, size_t *code_lex_size,
   if (type != HYBRID) {
     (*code_lex)[(*code_lex_index)].order = malloc(1);
     (*code_lex)[(*code_lex_index)].order[0] = '\0';
-    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
 
@@ -184,7 +174,7 @@ void append_token_b(token **code_lex, size_t *code_lex_size,
   } else
     (*code_lex)[(*code_lex_index)].type = type;
 
-  size_t old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
+  int old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
   (*code_lex)[(*code_lex_index)].order =
       realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
   (*code_lex)[(*code_lex_index)].order[old_order_strlen] = '{';
@@ -195,7 +185,7 @@ void append_token_b(token **code_lex, size_t *code_lex_size,
   (*code_lex)[(*code_lex_index)].brace_lengths_length++;
   (*code_lex)[(*code_lex_index)].brace_lengths = realloc(
       (*code_lex)[(*code_lex_index)].brace_lengths,
-      (*code_lex)[(*code_lex_index)].brace_lengths_length * sizeof(size_t));
+      (*code_lex)[(*code_lex_index)].brace_lengths_length * sizeof(int));
   (*code_lex)[(*code_lex_index)]
       .brace_lengths[(*code_lex)[(*code_lex_index)].brace_lengths_length - 1] =
       length_token_argument;
@@ -210,10 +200,9 @@ void append_token_b(token **code_lex, size_t *code_lex_size,
   (*code_lex_index)++;
 }
 
-void append_token_bk(token **code_lex, size_t *code_lex_size,
-                     size_t *code_lex_index, enum token_type type,
-                     char *string_argument, token *token_argument,
-                     int length_token_argument) {
+void append_token_bk(token **code_lex, int *code_lex_size, int *code_lex_index,
+                     enum token_type type, char *string_argument,
+                     token *token_argument, int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
@@ -222,26 +211,26 @@ void append_token_bk(token **code_lex, size_t *code_lex_size,
   if (type != HYBRID) {
     (*code_lex)[(*code_lex_index)].order = malloc(1);
     (*code_lex)[(*code_lex_index)].order[0] = '\0';
-    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
     (*code_lex)[(*code_lex_index)].type = HYBRID;
   } else
     (*code_lex)[(*code_lex_index)].type = type;
 
-  size_t old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
+  int old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
   (*code_lex)[(*code_lex_index)].order =
       realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
   (*code_lex)[(*code_lex_index)].order[old_order_strlen] = '[';
@@ -251,7 +240,7 @@ void append_token_bk(token **code_lex, size_t *code_lex_size,
   (*code_lex)[(*code_lex_index)].brack_lengths_length++;
   (*code_lex)[(*code_lex_index)].brack_lengths = realloc(
       (*code_lex)[(*code_lex_index)].brack_lengths,
-      (*code_lex)[(*code_lex_index)].brack_lengths_length * sizeof(size_t));
+      (*code_lex)[(*code_lex_index)].brack_lengths_length * sizeof(int));
   (*code_lex)[(*code_lex_index)]
       .brack_lengths[(*code_lex)[(*code_lex_index)].brack_lengths_length - 1] =
       length_token_argument;
@@ -266,10 +255,9 @@ void append_token_bk(token **code_lex, size_t *code_lex_size,
   (*code_lex_index)++;
 }
 
-void append_token_p(token **code_lex, size_t *code_lex_size,
-                    size_t *code_lex_index, enum token_type type,
-                    char *string_argument, token *token_argument,
-                    int length_token_argument) {
+void append_token_p(token **code_lex, int *code_lex_size, int *code_lex_index,
+                    enum token_type type, char *string_argument,
+                    token *token_argument, int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
@@ -278,26 +266,26 @@ void append_token_p(token **code_lex, size_t *code_lex_size,
   if (type != HYBRID) {
     (*code_lex)[(*code_lex_index)].order = malloc(1);
     (*code_lex)[(*code_lex_index)].order[0] = '\0';
-    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
 
-    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(int));
     (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
     (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
     (*code_lex)[(*code_lex_index)].type = HYBRID;
   } else
     (*code_lex)[(*code_lex_index)].type = type;
 
-  size_t old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
+  int old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
   (*code_lex)[(*code_lex_index)].order =
       realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
   (*code_lex)[(*code_lex_index)].order[old_order_strlen] = '(';
@@ -307,7 +295,7 @@ void append_token_p(token **code_lex, size_t *code_lex_size,
   (*code_lex)[(*code_lex_index)].paren_lengths_length++;
   (*code_lex)[(*code_lex_index)].paren_lengths = realloc(
       (*code_lex)[(*code_lex_index)].paren_lengths,
-      (*code_lex)[(*code_lex_index)].paren_lengths_length * sizeof(size_t));
+      (*code_lex)[(*code_lex_index)].paren_lengths_length * sizeof(int));
   (*code_lex)[(*code_lex_index)]
       .paren_lengths[(*code_lex)[(*code_lex_index)].paren_lengths_length - 1] =
       length_token_argument;
@@ -322,9 +310,9 @@ void append_token_p(token **code_lex, size_t *code_lex_size,
   (*code_lex_index)++;
 }
 
-void append_token(token **code_lex, size_t *code_lex_size,
-                  size_t *code_lex_index, enum token_type type,
-                  char *string_argument, token *token_argument) {
+void append_token(token **code_lex, int *code_lex_size, int *code_lex_index,
+                  enum token_type type, char *string_argument,
+                  token *token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
@@ -360,22 +348,22 @@ int letter_number_underscore_or_space(char symbol) {
          (symbol >= 'a' && symbol <= 'z') || (symbol == '_') || (symbol == ' ');
 }
 
-token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
-  size_t code_lex_size = 1;
-  size_t code_lex_index = 0;
+token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
+  int code_lex_size = 1;
+  int code_lex_index = 0;
   token *code_lex = malloc(code_lex_size * sizeof(token *));
 
   int quote_mode = 0;
-  size_t quote_buf_start;
+  int quote_buf_start;
 
   int paren_mode = 0;
   int brace_mode = 0;
   int colon_mode = 0;
   int brack_mode = 0;
-  size_t paren_buf_start;
-  size_t brace_buf_start;
-  size_t colon_buf_start;
-  size_t brack_buf_start;
+  int paren_buf_start;
+  int brace_buf_start;
+  int colon_buf_start;
+  int brack_buf_start;
 
   int comment_mode = 0;
   int multi_comment_mode = 0;
@@ -427,7 +415,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       strncpy(paren_arg, &raw_code[paren_buf_start], buf_size);
       paren_arg[buf_size] = '\0';
 
-      size_t lexed_paren_index;
+      int lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 &&
@@ -435,6 +423,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
             get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
            code_lex[code_lex_index - 1].type == '(' ||
            code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
         append_token_p(&code_lex, &code_lex_size, &code_lex_index,
@@ -465,7 +454,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       strncpy(paren_arg, &raw_code[brace_buf_start], buf_size);
       paren_arg[buf_size] = '\0';
 
-      size_t lexed_paren_index;
+      int lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 &&
@@ -473,6 +462,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
             get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
            code_lex[code_lex_index - 1].type == '(' ||
            code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
         append_token_b(&code_lex, &code_lex_size, &code_lex_index,
@@ -503,7 +493,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       strncpy(paren_arg, &raw_code[brack_buf_start], buf_size);
       paren_arg[buf_size] = '\0';
 
-      size_t lexed_paren_index;
+      int lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 &&
@@ -511,6 +501,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
             get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
            code_lex[code_lex_index - 1].type == '(' ||
            code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
         append_token_bk(&code_lex, &code_lex_size, &code_lex_index,
@@ -541,7 +532,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       strncpy(paren_arg, &raw_code[colon_buf_start], buf_size);
       paren_arg[buf_size] = '\0';
 
-      size_t lexed_paren_index;
+      int lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
       if (code_lex_index > 0 &&
@@ -549,6 +540,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
             get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
            code_lex[code_lex_index - 1].type == '(' ||
            code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type ==
                HYBRID)) { // if its able to attach to the last token
         code_lex_index--;
@@ -581,7 +573,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
     }
 
     enum token_type type = INT;
-    size_t num_start = i;
+    int num_start = i;
 
     while (number_or_dot(raw_code[i])) {
       if (raw_code[i] == '.')
@@ -608,7 +600,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
     }
 
     type = WORD;
-    size_t word_start = i;
+    int word_start = i;
 
     while (letter_number_or_underscore(raw_code[i])) {
       i++;
@@ -632,7 +624,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
     int multi_char_symbol = 0;
 
     for (int j = 0; j < LOCAL_LEN(symbols); j++) {
-      size_t strlen_symbols_j = strlen(symbols[j]);
+      int strlen_symbols_j = strlen(symbols[j]);
 
       if (strncmp(&raw_code[i], symbols[j], strlen_symbols_j) == 0) {
         append_token(&code_lex, &code_lex_size, &code_lex_index, 128 + j, NULL,
@@ -655,7 +647,7 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch"
-void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
+void tree(node *code_tree_ptr, token *code_lex, int code_lex_index) {
   if (code_lex_index == 0) {
     code_tree_ptr->type = END;
     return;
@@ -1741,13 +1733,13 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
             parens++;
             break;
           case '{':
-            tree(parent->left, code_lex[i].brack_argument[bracks],
-                 code_lex[i].brack_lengths[bracks]);
+            tree(parent->left, code_lex[i].brace_argument[bracks],
+                 code_lex[i].brace_lengths[bracks]);
             bracks++;
             break;
           case '[':
-            tree(parent->left, code_lex[i].brace_argument[braces],
-                 code_lex[i].brace_lengths[braces]);
+            tree(parent->left, code_lex[i].brack_argument[braces],
+                 code_lex[i].brack_lengths[braces]);
             braces++;
             break;
           }
@@ -2011,7 +2003,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
   code_tree_ptr->token_argument = code_lex;
 }
 
-void print_tree(node *root, size_t tabs) {
+void print_tree(node *root, int tabs) {
   for (int i = 0; i < tabs; i++)
     printf("   ");
   printf("left type: %d", root->left->type);
@@ -3047,28 +3039,20 @@ variable *evaluate(node *root, variable *high_var, int id) {
     strcpy(new_var->name, "SSA");
     return new_var;
   } else if (root->type == '(') {
-    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-    // else general_dynIR("sizeof", left, right);
-
-    // variable* new_var = malloc(sizeof(variable));
-    // new_var->name = malloc(4);
-    // new_var->name[3] = '\0';
-    // strcpy(new_var->name, "SSA");
-    // return new_var;
+    variable *to_return = evaluate(root->left, high_var, id);
+    evaluate(root->right, high_var, id);
+    return to_return;
   } else if (root->type == '[') {
-    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-    // else general_dynIR("sizeof", left, right);
 
-    // variable* new_var = malloc(sizeof(variable));
-    // new_var->name = malloc(4);
-    // new_var->name[3] = '\0';
-    // strcpy(new_var->name, "SSA");
-    // return new_var;
+    // this just by itself probably isnt gonna happen but i'll keep it in the
+    // compiler just in case i make a new feature or something
+
   } else if (root->type == '{') {
+
+    // THIS IS EXTREMELY IMPORTANT, ITS USED
+    // TO MAKE A NEW SCOPE!!!!!
+    // DO NOT FORGET TO CODE THIS PROPERLY
+
     // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
     // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
     // if (right == NULL) iter_general_dynIR("sizeof", left, "");
@@ -3105,11 +3089,11 @@ int main(int argc, char **argv) {
 
   scope = 0;
 
-  size_t strlen_argv_1 =
+  int strlen_argv_1 =
       strlen(argv[1]); // "argv[1]" because I don't want to have to deal with
                        // file management until I need to
   char *raw_code = argv[1];
-  size_t code_lex_index;
+  int code_lex_index;
   token *code_lex = lex(raw_code, strlen_argv_1, &code_lex_index);
 
   // FOR PRINTING LEX:
