@@ -3143,7 +3143,7 @@ variable *evaluate(node *root, variable *high_var, int id) {
   } else if (root->type == HYBRID_N) {
 
     if (root->right->type == END) {
-      // these are the individual calls for parenthesis and brackets
+      // these are the individual calls for parenthesis and braces
       switch (root->left->type) {
       case '(': {
         if (root->name != NULL) {
@@ -3201,16 +3201,11 @@ variable *evaluate(node *root, variable *high_var, int id) {
       }
       }
     }
-    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-    // else general_dynIR("sizeof", left, right);
 
-    // variable* new_var = malloc(sizeof(variable));
-    // new_var->name = malloc(4);
-    // new_var->name[3] = '\0';
-    // strcpy(new_var->name, "SSA");
-    // return new_var;
+    // we just have to keep going down the HYBRID_N sub-tree until we read a
+    // scope definition with a parenthesis right behind it. until we find that,
+    // just keep evaluating everything normally, like amalgms with brackets and
+    // priority with parenthesis
   }
   return NULL;
 }
