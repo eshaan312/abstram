@@ -5,17 +5,21 @@
 /*
 ok so heres the plan to handle the parenthesis situation:
 - make a different append token function for specifically parenthesis
-- rewrite the parenthesis tokenizer and the parenthesis tree creator to follow the new conventions
+- rewrite the parenthesis tokenizer and the parenthesis tree creator to follow
+the new conventions
 - fix everything for brackets
-- basically the goal is to make the amount of parenthesis, brackets, etc. you can add to an argument to make it very easy to use 
+- basically the goal is to make the amount of parenthesis, brackets, etc. you
+can add to an argument to make it very easy to use
 
 
-- interoperability in C isn't checked for safety. you just use a function signature and you can say in the function signature what will be dependent on what, which can guarantee safety if done correctly.
+- interoperability in C isn't checked for safety. you just use a function
+signature and you can say in the function signature what will be dependent on
+what, which can guarantee safety if done correctly.
 */
 
 enum token_type;
 struct token_struct;
-char *symbols[] = { // sort by len of symbol 
+char *symbols[] = { // sort by len of symbol
     "bitcast", "sizeof", "cast", "<<=", ">>=", "..", "+=", "-=", "*=",
     "=>",      "/=",     "&=",   "^=",  "|=",  "%=", "||", "&&", "==",
     "!=",      ">=",     "<=",   "<<",  ">>",  "++", "--", "->", "!!"};
@@ -26,7 +30,8 @@ struct node_struct;
 enum token_type {
   WORD = 128 + LOCAL_LEN(symbols), // 128 because that's where ASCII ends
   INT,
-  FLOAT
+  FLOAT,
+  HYBRID
 };
 
 enum node_type {
@@ -34,34 +39,34 @@ enum node_type {
   FUNCTION_CALL,
   LITERAL,
   END,
-  BRACK_PAREN,
-  BRACE_PAREN
+  HYBRID_N
 };
 
 typedef struct token_struct {
   enum token_type type;
   char *string_argument;
 
-  struct token_struct **token_argument;
+  struct token_struct *token_argument;
   struct token_struct **paren_argument;
   struct token_struct **colon_argument;
   struct token_struct **brace_argument;
   struct token_struct **brack_argument;
 
-  size_t* token_lengths;
-  size_t token_lengths_length;
+  size_t token_length;
 
-  size_t* paren_lengths;
+  size_t *paren_lengths;
   size_t paren_lengths_length;
 
-  size_t* colon_lengths;
-  size_t paren_lengths_length;
+  size_t *colon_lengths;
+  size_t colon_lengths_length;
 
-  size_t* brace_lengths;
+  size_t *brace_lengths;
   size_t brace_lengths_length;
 
-  size_t* brack_lengths;
+  size_t *brack_lengths;
   size_t brack_lengths_length;
+
+  char *order; // order that they were attached to the data "({[(([{("
 } token;
 
 typedef struct node_struct {
@@ -79,16 +84,16 @@ typedef struct variable_struct {
   char *type;
   int memtype; // stack=0, heap=1, SSA=2
   int scope;
-  int* scope_to_destroy;
+  int *scope_to_destroy;
 } variable;
 
 variable **variable_list;
 size_t variable_list_length;
 
 typedef struct instruction_struct {
-	int id;
-	size_t args_len;
-	variable** args;
+  int id;
+  size_t args_len;
+  variable **args;
 } instruction;
 
 instruction **program;
@@ -97,46 +102,223 @@ size_t scope;
 
 void append_token_c(token **code_lex, size_t *code_lex_size,
                     size_t *code_lex_index, enum token_type type,
-                    char *string_argument, token *token_argument) {
+                    char *string_argument, token *token_argument,
+                    int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
   }
 
-  (*code_lex)[(*code_lex_index)].type = type;
+  if (type != HYBRID) {
+    (*code_lex)[(*code_lex_index)].order = malloc(1);
+    (*code_lex)[(*code_lex_index)].order[0] = '\0';
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
+    (*code_lex)[(*code_lex_index)].type = HYBRID;
+  }
+
+  else
+    (*code_lex)[(*code_lex_index)].type = type;
   (*code_lex)[(*code_lex_index)].string_argument = string_argument;
-  (*code_lex)[(*code_lex_index)].colon_argument = token_argument;
-  (*code_lex)[(*code_lex_index)].colon_length = 0;
+
+  (*code_lex)[(*code_lex_index)].colon_lengths_length++;
+  (*code_lex)[(*code_lex_index)].colon_lengths = realloc(
+      (*code_lex)[(*code_lex_index)].colon_lengths,
+      (*code_lex)[(*code_lex_index)].colon_lengths_length * sizeof(size_t));
+  (*code_lex)[(*code_lex_index)]
+      .colon_lengths[(*code_lex)[(*code_lex_index)].colon_lengths_length - 1] =
+      length_token_argument;
+
+  (*code_lex)[(*code_lex_index)].colon_argument = realloc(
+      (*code_lex)[(*code_lex_index)].colon_argument,
+      (*code_lex)[(*code_lex_index)].colon_lengths_length * sizeof(token *));
+
+  (*code_lex)[(*code_lex_index)]
+      .colon_argument[(*code_lex)[(*code_lex_index)].colon_lengths_length - 1] =
+      token_argument;
   (*code_lex_index)++;
 }
 
 void append_token_b(token **code_lex, size_t *code_lex_size,
                     size_t *code_lex_index, enum token_type type,
-                    char *string_argument, token *token_argument) {
+                    char *string_argument, token *token_argument,
+                    int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
   }
 
-  (*code_lex)[(*code_lex_index)].type = type;
+  if (type != HYBRID) {
+    (*code_lex)[(*code_lex_index)].order = malloc(1);
+    (*code_lex)[(*code_lex_index)].order[0] = '\0';
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].type = HYBRID;
+  } else
+    (*code_lex)[(*code_lex_index)].type = type;
+
+  size_t old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
+  (*code_lex)[(*code_lex_index)].order =
+      realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
+  (*code_lex)[(*code_lex_index)].order[old_order_strlen] = '{';
+  (*code_lex)[(*code_lex_index)].order[old_order_strlen + 1] = '\0';
+
   (*code_lex)[(*code_lex_index)].string_argument = string_argument;
-  (*code_lex)[(*code_lex_index)].brace_argument = token_argument;
-  (*code_lex)[(*code_lex_index)].brace_length = 0;
+
+  (*code_lex)[(*code_lex_index)].brace_lengths_length++;
+  (*code_lex)[(*code_lex_index)].brace_lengths = realloc(
+      (*code_lex)[(*code_lex_index)].brace_lengths,
+      (*code_lex)[(*code_lex_index)].brace_lengths_length * sizeof(size_t));
+  (*code_lex)[(*code_lex_index)]
+      .brace_lengths[(*code_lex)[(*code_lex_index)].brace_lengths_length - 1] =
+      length_token_argument;
+
+  (*code_lex)[(*code_lex_index)].brace_argument = realloc(
+      (*code_lex)[(*code_lex_index)].brace_argument,
+      (*code_lex)[(*code_lex_index)].brace_lengths_length * sizeof(token *));
+
+  (*code_lex)[(*code_lex_index)]
+      .brace_argument[(*code_lex)[(*code_lex_index)].brace_lengths_length - 1] =
+      token_argument;
   (*code_lex_index)++;
 }
 
 void append_token_bk(token **code_lex, size_t *code_lex_size,
                      size_t *code_lex_index, enum token_type type,
-                     char *string_argument, token *token_argument) {
+                     char *string_argument, token *token_argument,
+                     int length_token_argument) {
   while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
     (*code_lex_size) *= 2;
     *code_lex = realloc(*code_lex, (*code_lex_size));
   }
 
-  (*code_lex)[(*code_lex_index)].type = type;
+  if (type != HYBRID) {
+    (*code_lex)[(*code_lex_index)].order = malloc(1);
+    (*code_lex)[(*code_lex_index)].order[0] = '\0';
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
+    (*code_lex)[(*code_lex_index)].type = HYBRID;
+  } else
+    (*code_lex)[(*code_lex_index)].type = type;
+
+  size_t old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
+  (*code_lex)[(*code_lex_index)].order =
+      realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
+  (*code_lex)[(*code_lex_index)].order[old_order_strlen] = '[';
+  (*code_lex)[(*code_lex_index)].order[old_order_strlen + 1] = '\0';
   (*code_lex)[(*code_lex_index)].string_argument = string_argument;
-  (*code_lex)[(*code_lex_index)].brack_argument = token_argument;
-  (*code_lex)[(*code_lex_index)].brack_length = 0;
+
+  (*code_lex)[(*code_lex_index)].brack_lengths_length++;
+  (*code_lex)[(*code_lex_index)].brack_lengths = realloc(
+      (*code_lex)[(*code_lex_index)].brack_lengths,
+      (*code_lex)[(*code_lex_index)].brack_lengths_length * sizeof(size_t));
+  (*code_lex)[(*code_lex_index)]
+      .brack_lengths[(*code_lex)[(*code_lex_index)].brack_lengths_length - 1] =
+      length_token_argument;
+
+  (*code_lex)[(*code_lex_index)].brack_argument = realloc(
+      (*code_lex)[(*code_lex_index)].brack_argument,
+      (*code_lex)[(*code_lex_index)].brack_lengths_length * sizeof(token *));
+
+  (*code_lex)[(*code_lex_index)]
+      .brack_argument[(*code_lex)[(*code_lex_index)].brack_lengths_length - 1] =
+      token_argument;
+  (*code_lex_index)++;
+}
+
+void append_token_p(token **code_lex, size_t *code_lex_size,
+                    size_t *code_lex_index, enum token_type type,
+                    char *string_argument, token *token_argument,
+                    int length_token_argument) {
+  while ((*code_lex_size) < ((*code_lex_index) + 1) * sizeof(token)) {
+    (*code_lex_size) *= 2;
+    *code_lex = realloc(*code_lex, (*code_lex_size));
+  }
+
+  if (type != HYBRID) {
+    (*code_lex)[(*code_lex_index)].order = malloc(1);
+    (*code_lex)[(*code_lex_index)].order[0] = '\0';
+    (*code_lex)[(*code_lex_index)].colon_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].colon_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].colon_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brace_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brace_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brace_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].brack_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].brack_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].brack_argument = malloc(sizeof(token *));
+
+    (*code_lex)[(*code_lex_index)].paren_lengths = malloc(sizeof(size_t));
+    (*code_lex)[(*code_lex_index)].paren_lengths_length = 0;
+    (*code_lex)[(*code_lex_index)].paren_argument = malloc(sizeof(token *));
+    (*code_lex)[(*code_lex_index)].type = HYBRID;
+  } else
+    (*code_lex)[(*code_lex_index)].type = type;
+
+  size_t old_order_strlen = strlen((*code_lex)[(*code_lex_index)].order);
+  (*code_lex)[(*code_lex_index)].order =
+      realloc((*code_lex)[(*code_lex_index)].order, old_order_strlen + 2);
+  (*code_lex)[(*code_lex_index)].order[old_order_strlen] = '(';
+  (*code_lex)[(*code_lex_index)].order[old_order_strlen + 1] = '\0';
+  (*code_lex)[(*code_lex_index)].string_argument = string_argument;
+
+  (*code_lex)[(*code_lex_index)].paren_lengths_length++;
+  (*code_lex)[(*code_lex_index)].paren_lengths = realloc(
+      (*code_lex)[(*code_lex_index)].paren_lengths,
+      (*code_lex)[(*code_lex_index)].paren_lengths_length * sizeof(size_t));
+  (*code_lex)[(*code_lex_index)]
+      .paren_lengths[(*code_lex)[(*code_lex_index)].paren_lengths_length - 1] =
+      length_token_argument;
+
+  (*code_lex)[(*code_lex_index)].paren_argument = realloc(
+      (*code_lex)[(*code_lex_index)].paren_argument,
+      (*code_lex)[(*code_lex_index)].paren_lengths_length * sizeof(token *));
+
+  (*code_lex)[(*code_lex_index)]
+      .paren_argument[(*code_lex)[(*code_lex_index)].paren_lengths_length - 1] =
+      token_argument;
   (*code_lex_index)++;
 }
 
@@ -151,13 +333,6 @@ void append_token(token **code_lex, size_t *code_lex_size,
   (*code_lex)[(*code_lex_index)].type = type;
   (*code_lex)[(*code_lex_index)].string_argument = string_argument;
   (*code_lex)[(*code_lex_index)].token_argument = token_argument;
-  (*code_lex)[(*code_lex_index)].token_length = 0;
-
-  if (type == WORD) {
-    (*code_lex)[(*code_lex_index)].brace_length = 0;
-    (*code_lex)[(*code_lex_index)].brack_length = 0;
-    (*code_lex)[(*code_lex_index)].colon_length = 0;
-  }
 
   (*code_lex_index)++;
 }
@@ -255,17 +430,20 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       size_t lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
-      if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
-                                 code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == '[')) {
+      if (code_lex_index > 0 &&
+          ((code_lex[code_lex_index - 1].type == WORD &&
+            get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
+           code_lex[code_lex_index - 1].type == '(' ||
+           code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
-        append_token(&code_lex, &code_lex_size, &code_lex_index, WORD,
-                     code_lex[code_lex_index].string_argument, lexed_paren);
+        append_token_p(&code_lex, &code_lex_size, &code_lex_index,
+                       HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
+                       code_lex[code_lex_index].string_argument, lexed_paren,
+                       lexed_paren_index);
       } else
-        append_token(&code_lex, &code_lex_size, &code_lex_index, '(', NULL,
-                     lexed_paren);
-      code_lex[code_lex_index - 1].token_length = lexed_paren_index;
-      free(paren_arg);
+        append_token_p(&code_lex, &code_lex_size, &code_lex_index, '(', NULL,
+                       lexed_paren, lexed_paren_index);
 
       continue;
     } else if (paren_mode)
@@ -290,17 +468,20 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       size_t lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
-      if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
-                                 code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == '[')) {
+      if (code_lex_index > 0 &&
+          ((code_lex[code_lex_index - 1].type == WORD &&
+            get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
+           code_lex[code_lex_index - 1].type == '(' ||
+           code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
-        append_token_b(&code_lex, &code_lex_size, &code_lex_index, WORD,
-                       code_lex[code_lex_index].string_argument, lexed_paren);
+        append_token_b(&code_lex, &code_lex_size, &code_lex_index,
+                       HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
+                       code_lex[code_lex_index].string_argument, lexed_paren,
+                       lexed_paren_index);
       } else
         append_token_b(&code_lex, &code_lex_size, &code_lex_index, '{', NULL,
-                       lexed_paren);
-      code_lex[code_lex_index - 1].brace_length = lexed_paren_index;
-      free(paren_arg);
+                       lexed_paren, lexed_paren_index);
 
       continue;
     } else if (brace_mode)
@@ -325,17 +506,20 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       size_t lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
-      if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
-                                 code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == '[')) {
+      if (code_lex_index > 0 &&
+          ((code_lex[code_lex_index - 1].type == WORD &&
+            get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
+           code_lex[code_lex_index - 1].type == '(' ||
+           code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
-        append_token_bk(&code_lex, &code_lex_size, &code_lex_index, WORD,
-                        code_lex[code_lex_index].string_argument, lexed_paren);
+        append_token_bk(&code_lex, &code_lex_size, &code_lex_index,
+                        HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
+                        code_lex[code_lex_index].string_argument, lexed_paren,
+                        lexed_paren_index);
       } else
         append_token_bk(&code_lex, &code_lex_size, &code_lex_index, '[', NULL,
-                        lexed_paren);
-      code_lex[code_lex_index - 1].brack_length = lexed_paren_index;
-      free(paren_arg);
+                        lexed_paren, lexed_paren_index);
 
       continue;
     } else if (brack_mode)
@@ -360,24 +544,26 @@ token *lex(char *raw_code, size_t strlen_argv_1, size_t *code_lex_index_ptr) {
       size_t lexed_paren_index;
       token *lexed_paren =
           lex(paren_arg, strlen(paren_arg), &lexed_paren_index);
-      if (code_lex_index > 0 && (code_lex[code_lex_index - 1].type == WORD ||
-                                 code_lex[code_lex_index - 1].type == '(' ||
-                                 code_lex[code_lex_index - 1].type == ':' ||
-                                 code_lex[code_lex_index - 1].type == '[')) {
+      if (code_lex_index > 0 &&
+          ((code_lex[code_lex_index - 1].type == WORD &&
+            get_symbol(code_lex[code_lex_index - 1].string_argument) == -1) ||
+           code_lex[code_lex_index - 1].type == '(' ||
+           code_lex[code_lex_index - 1].type == '[' ||
+           code_lex[code_lex_index - 1].type ==
+               HYBRID)) { // if its able to attach to the last token
         code_lex_index--;
-        append_token_c(&code_lex, &code_lex_size, &code_lex_index, WORD,
-                       code_lex[code_lex_index].string_argument, lexed_paren);
+        append_token_c(&code_lex, &code_lex_size, &code_lex_index,
+                       HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
+                       code_lex[code_lex_index].string_argument, lexed_paren,
+                       lexed_paren_index);
       } else
         continue;
-
-      code_lex[code_lex_index - 1].colon_length = lexed_paren_index;
-      free(paren_arg);
 
       continue;
     } else if (colon_mode)
       continue;
 
-    if (!colon_mode && raw_code[i] == ':'){
+    if (!colon_mode && raw_code[i] == ':') {
       colon_mode++;
       colon_buf_start = i + 1;
 
@@ -557,7 +743,7 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-    tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
       return;
     }
     default:
@@ -620,17 +806,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-            if (code_lex[i].type == get_symbol("||")){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("||")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     }
@@ -694,17 +881,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                  if (code_lex[i].type == get_symbol("&&")){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("&&")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -761,17 +949,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                  if (code_lex[i].type == get_symbol("|")){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("|")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -828,17 +1017,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                  if (code_lex[i].type == get_symbol("^")){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("^")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -895,17 +1085,18 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                  if (code_lex[i].type == get_symbol("&")){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("&")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -970,18 +1161,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                  if (code_lex[i].type == get_symbol("==") ||
-             code_lex[i].type == get_symbol("!=")){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("==") ||
+          code_lex[i].type == get_symbol("!=")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -1052,19 +1244,20 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                        if (code_lex[i].type == get_symbol(">=") ||
-             code_lex[i].type == get_symbol("<=") || code_lex[i].type == '>' ||
-             code_lex[i].type == '<' || code_lex[i].type == get_symbol("..")) {
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol(">=") ||
+          code_lex[i].type == get_symbol("<=") || code_lex[i].type == '>' ||
+          code_lex[i].type == '<' || code_lex[i].type == get_symbol("..")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -1129,18 +1322,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-                              if (code_lex[i].type == get_symbol("<<") ||
-             code_lex[i].type == get_symbol(">>")) {
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == get_symbol("<<") ||
+          code_lex[i].type == get_symbol(">>")) {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -1156,7 +1350,9 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
     case '+':;
       if (i == 0 ||
           (i > 0 && code_lex[i - 1].type != WORD &&
-           code_lex[i - 1].type != INT && code_lex[i - 1].type != FLOAT && code_lex[i - 1].type != '(' && code_lex[i - 1].type != '[' && code_lex[i - 1].type != '{')) {
+           code_lex[i - 1].type != INT && code_lex[i - 1].type != FLOAT &&
+           code_lex[i - 1].type != '(' && code_lex[i - 1].type != '[' &&
+           code_lex[i - 1].type != '{')) {
         break;
       }
 
@@ -1220,18 +1416,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
 
-      if (code_lex[i].type == '+' || code_lex[i].type == '-'){
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      if (code_lex[i].type == '+' || code_lex[i].type == '-') {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -1292,18 +1489,19 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
       code_tree_ptr->right->type = PROGRAM;
-      token* to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
-            if (code_lex[i].type == '*' ||
-             code_lex[i].type == '%' || code_lex[i].type == '/') {
-	      memcpy(to_return + 1, &code_lex[i], sizeof(token) * (code_lex_index - i));
-	      to_return[0].type = WORD;
-	      to_return[0].string_argument = malloc(4);
-	      to_return[0].string_argument[3] = '\0';
-	      strcpy(to_return[0].string_argument, "SSA");
-      tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
+      token *to_return = malloc(sizeof(token) * (1 + code_lex_index - i));
+      if (code_lex[i].type == '*' || code_lex[i].type == '%' ||
+          code_lex[i].type == '/') {
+        memcpy(to_return + 1, &code_lex[i],
+               sizeof(token) * (code_lex_index - i));
+        to_return[0].type = WORD;
+        to_return[0].string_argument = malloc(4);
+        to_return[0].string_argument[3] = '\0';
+        strcpy(to_return[0].string_argument, "SSA");
+        tree(code_tree_ptr->right, to_return, code_lex_index - i + 1);
       } else {
-	      to_return = &code_lex[i];
-      tree(code_tree_ptr->right, to_return, code_lex_index - i);
+        to_return = &code_lex[i];
+        tree(code_tree_ptr->right, to_return, code_lex_index - i);
       }
       return;
     default:
@@ -1345,7 +1543,9 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       token *left_token_argument = malloc(sizeof(token));
       memcpy(left_token_argument, &code_lex[restore_i], sizeof(token));
 
-      code_tree_ptr->left->type = (enum node_type)code_lex[restore_i - 1].type + (int)10000; // means unary operator for + and -
+      code_tree_ptr->left->type =
+          (enum node_type)code_lex[restore_i - 1].type +
+          (int)10000; // means unary operator for + and -
       code_tree_ptr->left->back = code_tree_ptr;
 
       tree(code_tree_ptr->left->left, left_token_argument, restore_i_minus_i);
@@ -1452,8 +1652,8 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->type = (enum node_type)'(';
       code_tree_ptr->left->back = code_tree_ptr;
 
-      tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-           code_lex[i].token_length);
+      tree(code_tree_ptr->left->left, code_lex[i].paren_argument[0],
+           code_lex[i].paren_lengths[0]);
       code_tree_ptr->right->back = code_tree_ptr;
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
@@ -1479,8 +1679,8 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->type = (enum node_type)'{';
       code_tree_ptr->left->back = code_tree_ptr;
 
-      tree(code_tree_ptr->left->left, code_lex[i].brace_argument,
-           code_lex[i].brace_length);
+      tree(code_tree_ptr->left->left, code_lex[i].brace_argument[0],
+           code_lex[i].brace_lengths[0]);
       code_tree_ptr->right->back = code_tree_ptr;
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
@@ -1506,8 +1706,8 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       code_tree_ptr->left->type = (enum node_type)'[';
       code_tree_ptr->left->back = code_tree_ptr;
 
-      tree(code_tree_ptr->left->left, code_lex[i].brack_argument,
-           code_lex[i].brack_length);
+      tree(code_tree_ptr->left->left, code_lex[i].brack_argument[0],
+           code_lex[i].brack_lengths[0]);
       code_tree_ptr->right->back = code_tree_ptr;
       code_tree_ptr->right->left = malloc(sizeof(node));
       code_tree_ptr->right->right = malloc(sizeof(node));
@@ -1516,166 +1716,219 @@ void tree(node *code_tree_ptr, token *code_lex, size_t code_lex_index) {
       return;
     }
 
-    case WORD:
+    case HYBRID:
       // ok so this is gonna handle attached parens, brackets, and braces.
-      // something can have parenthesis && brackets || parenthesis && braces
-      // || all indivduals by themselves
       // the evaluator can handle colons itself.
       {
-        if (code_lex[i].token_length != 0 && code_lex[i].brack_length != 0) {
-          code_tree_ptr->left->name =
-              malloc(1 + strlen(code_lex[i].string_argument));
+        // create left HYBRID_N node
+        code_tree_ptr->left->type = HYBRID_N;
+        code_tree_ptr->left->name = code_lex[i].string_argument;
+        node *parent = code_tree_ptr->left;
+        int parens = 0;
+        int bracks = 0;
+        int braces = 0;
 
-          strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-          code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] = '\0';
+        for (int x = 0; x < strlen(code_lex[i].order); x++) {
+          parent->left = malloc(sizeof(node));
+          parent->left->type = code_lex[i].order[x];
+          parent->left->left = malloc(sizeof(node));
+          parent->left->right = malloc(sizeof(node));
+          parent->left->back = parent;
+          switch (parent->left->type) {
+          case '(':
+            tree(parent->left, code_lex[i].paren_argument[parens],
+                 code_lex[i].paren_lengths[parens]);
+            parens++;
+            break;
+          case '{':
+            tree(parent->left, code_lex[i].brack_argument[bracks],
+                 code_lex[i].brack_lengths[bracks]);
+            bracks++;
+            break;
+          case '[':
+            tree(parent->left, code_lex[i].brace_argument[braces],
+                 code_lex[i].brace_lengths[braces]);
+            braces++;
+            break;
+          }
 
-          code_tree_ptr->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->type = PROGRAM;
-          code_tree_ptr->left->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->left->back = code_tree_ptr->left;
-          code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = PROGRAM;
-          code_tree_ptr->left->right->back = code_tree_ptr->left;
-          code_tree_ptr->left->right->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->left = malloc(sizeof(node));
+          parent->right = malloc(sizeof(node));
+          parent->right->type = HYBRID_N;
+          parent->right->back = parent;
+          parent->right->right = malloc(sizeof(node));
+          parent->right->left = malloc(sizeof(node));
 
-          code_tree_ptr->left->type = (enum node_type)BRACK_PAREN_WORD;
-          code_tree_ptr->left->back = code_tree_ptr;
-
-          tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-               code_lex[i].token_length);
-          tree(code_tree_ptr->left->right, code_lex[i].brack_argument,
-               code_lex[i].brack_length);
-
-          code_tree_ptr->right->back = code_tree_ptr;
-          code_tree_ptr->right->left = malloc(sizeof(node));
-          code_tree_ptr->right->right = malloc(sizeof(node));
-          code_tree_ptr->right->type = PROGRAM;
-          tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
-          return;
+          parent = parent->right;
         }
+        parent->type = END;
 
-        else if (code_lex[i].token_length != 0 &&
-                 code_lex[i].brace_length != 0) {
-          code_tree_ptr->left->name =
-              malloc(1 + strlen(code_lex[i].string_argument));
+        // do right continuation
+        code_tree_ptr->right->back = code_tree_ptr;
+        code_tree_ptr->right->left = malloc(sizeof(node));
+        code_tree_ptr->right->right = malloc(sizeof(node));
+        code_tree_ptr->right->type = PROGRAM;
+        tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
 
-          strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-          code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] = '\0';
-
-          code_tree_ptr->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->type = PROGRAM;
-          code_tree_ptr->left->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->left->back = code_tree_ptr->left;
-          code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = PROGRAM;
-          code_tree_ptr->left->right->back = code_tree_ptr->left;
-          code_tree_ptr->left->right->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->left = malloc(sizeof(node));
-
-          code_tree_ptr->left->type = (enum node_type)BRACE_PAREN_WORD;
-          code_tree_ptr->left->back = code_tree_ptr;
-
-          tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-               code_lex[i].token_length);
-          tree(code_tree_ptr->left->right, code_lex[i].brace_argument,
-               code_lex[i].brace_length);
-
-          code_tree_ptr->right->back = code_tree_ptr;
-          code_tree_ptr->right->left = malloc(sizeof(node));
-          code_tree_ptr->right->right = malloc(sizeof(node));
-          code_tree_ptr->right->type = PROGRAM;
-          tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
-          return;
-
-        } else if (code_lex[i].token_length != 0) {
-          code_tree_ptr->left->name =
-              malloc(1 + strlen(code_lex[i].string_argument));
-
-          strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-          code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] = '\0';
-
-          code_tree_ptr->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->type = PROGRAM;
-          code_tree_ptr->left->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->left->back = code_tree_ptr->left;
-          code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = END;
-          code_tree_ptr->left->right->token_argument = NULL;
-          code_tree_ptr->left->right->back = code_tree_ptr->left;
-
-          code_tree_ptr->left->type = (enum node_type)PAREN_WORD;
-          code_tree_ptr->left->back = code_tree_ptr;
-
-          tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-               code_lex[i].token_length);
-          code_tree_ptr->right->back = code_tree_ptr;
-          code_tree_ptr->right->left = malloc(sizeof(node));
-          code_tree_ptr->right->right = malloc(sizeof(node));
-          code_tree_ptr->right->type = PROGRAM;
-          tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
-          return;
-        } else if (code_lex[i].brack_length != 0) {
-          code_tree_ptr->left->name =
-              malloc(1 + strlen(code_lex[i].string_argument));
-
-          strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-          code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] = '\0';
-
-          code_tree_ptr->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->type = PROGRAM;
-          code_tree_ptr->left->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->left->back = code_tree_ptr->left;
-          code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = END;
-          code_tree_ptr->left->right->token_argument = NULL;
-          code_tree_ptr->left->right->back = code_tree_ptr->left;
-
-          code_tree_ptr->left->type = (enum node_type)BRACK_WORD;
-          code_tree_ptr->left->back = code_tree_ptr;
-
-          tree(code_tree_ptr->left->left, code_lex[i].brack_argument,
-               code_lex[i].brack_length);
-          code_tree_ptr->right->back = code_tree_ptr;
-          code_tree_ptr->right->left = malloc(sizeof(node));
-          code_tree_ptr->right->right = malloc(sizeof(node));
-          code_tree_ptr->right->type = PROGRAM;
-          tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
-          return;
-        } else if (code_lex[i].brace_length != 0) {
-          code_tree_ptr->left->name =
-              malloc(1 + strlen(code_lex[i].string_argument));
-
-          strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-          code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] = '\0';
-
-          code_tree_ptr->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->type = PROGRAM;
-          code_tree_ptr->left->left->left = malloc(sizeof(node));
-          code_tree_ptr->left->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->left->back = code_tree_ptr->left;
-          code_tree_ptr->left->right = malloc(sizeof(node));
-          code_tree_ptr->left->right->type = END;
-          code_tree_ptr->left->right->token_argument = NULL;
-          code_tree_ptr->left->right->back = code_tree_ptr->left;
-
-          code_tree_ptr->left->type = (enum node_type)BRACE_WORD;
-          code_tree_ptr->left->back = code_tree_ptr;
-
-          tree(code_tree_ptr->left->left, code_lex[i].brace_argument,
-               code_lex[i].brace_length);
-          code_tree_ptr->right->back = code_tree_ptr;
-          code_tree_ptr->right->left = malloc(sizeof(node));
-          code_tree_ptr->right->right = malloc(sizeof(node));
-          code_tree_ptr->right->type = PROGRAM;
-          tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
-          return;
-        } else
-          break;
+        // if (code_lex[i].token_length != 0 && code_lex[i].brack_length != 0) {
+        //   code_tree_ptr->left->name =
+        //       malloc(1 + strlen(code_lex[i].string_argument));
+        //
+        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
+        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
+        //   '\0';
+        //
+        //   code_tree_ptr->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->type = PROGRAM;
+        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->type = PROGRAM;
+        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->left = malloc(sizeof(node));
+        //
+        //   code_tree_ptr->left->type = (enum node_type)BRACK_PAREN_WORD;
+        //   code_tree_ptr->left->back = code_tree_ptr;
+        //
+        //   tree(code_tree_ptr->left->left, code_lex[i].token_argument,
+        //        code_lex[i].token_length);
+        //   tree(code_tree_ptr->left->right, code_lex[i].brack_argument,
+        //        code_lex[i].brack_length);
+        //
+        //   code_tree_ptr->right->back = code_tree_ptr;
+        //   code_tree_ptr->right->left = malloc(sizeof(node));
+        //   code_tree_ptr->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->right->type = PROGRAM;
+        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
+        //   1); return;
+        // }
+        //
+        // else if (code_lex[i].token_length != 0 &&
+        //          code_lex[i].brace_length != 0) {
+        //   code_tree_ptr->left->name =
+        //       malloc(1 + strlen(code_lex[i].string_argument));
+        //
+        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
+        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
+        //   '\0';
+        //
+        //   code_tree_ptr->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->type = PROGRAM;
+        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->type = PROGRAM;
+        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->left = malloc(sizeof(node));
+        //
+        //   code_tree_ptr->left->type = (enum node_type)BRACE_PAREN_WORD;
+        //   code_tree_ptr->left->back = code_tree_ptr;
+        //
+        //   tree(code_tree_ptr->left->left, code_lex[i].token_argument,
+        //        code_lex[i].token_length);
+        //   tree(code_tree_ptr->left->right, code_lex[i].brace_argument,
+        //        code_lex[i].brace_length);
+        //
+        //   code_tree_ptr->right->back = code_tree_ptr;
+        //   code_tree_ptr->right->left = malloc(sizeof(node));
+        //   code_tree_ptr->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->right->type = PROGRAM;
+        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
+        //   1); return;
+        //
+        // } else if (code_lex[i].token_length != 0) {
+        //   code_tree_ptr->left->name =
+        //       malloc(1 + strlen(code_lex[i].string_argument));
+        //
+        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
+        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
+        //   '\0';
+        //
+        //   code_tree_ptr->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->type = PROGRAM;
+        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->type = END;
+        //   code_tree_ptr->left->right->token_argument = NULL;
+        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
+        //
+        //   code_tree_ptr->left->type = (enum node_type)PAREN_WORD;
+        //   code_tree_ptr->left->back = code_tree_ptr;
+        //
+        //   tree(code_tree_ptr->left->left, code_lex[i].token_argument,
+        //        code_lex[i].token_length);
+        //   code_tree_ptr->right->back = code_tree_ptr;
+        //   code_tree_ptr->right->left = malloc(sizeof(node));
+        //   code_tree_ptr->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->right->type = PROGRAM;
+        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
+        //   1); return;
+        // } else if (code_lex[i].brack_length != 0) {
+        //   code_tree_ptr->left->name =
+        //       malloc(1 + strlen(code_lex[i].string_argument));
+        //
+        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
+        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
+        //   '\0';
+        //
+        //   code_tree_ptr->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->type = PROGRAM;
+        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->type = END;
+        //   code_tree_ptr->left->right->token_argument = NULL;
+        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
+        //
+        //   code_tree_ptr->left->type = (enum node_type)BRACK_WORD;
+        //   code_tree_ptr->left->back = code_tree_ptr;
+        //
+        //   tree(code_tree_ptr->left->left, code_lex[i].brack_argument,
+        //        code_lex[i].brack_length);
+        //   code_tree_ptr->right->back = code_tree_ptr;
+        //   code_tree_ptr->right->left = malloc(sizeof(node));
+        //   code_tree_ptr->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->right->type = PROGRAM;
+        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
+        //   1); return;
+        // } else if (code_lex[i].brace_length != 0) {
+        //   code_tree_ptr->left->name =
+        //       malloc(1 + strlen(code_lex[i].string_argument));
+        //
+        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
+        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
+        //   '\0';
+        //
+        //   code_tree_ptr->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->type = PROGRAM;
+        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
+        //   code_tree_ptr->left->right = malloc(sizeof(node));
+        //   code_tree_ptr->left->right->type = END;
+        //   code_tree_ptr->left->right->token_argument = NULL;
+        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
+        //
+        //   code_tree_ptr->left->type = (enum node_type)BRACE_WORD;
+        //   code_tree_ptr->left->back = code_tree_ptr;
+        //
+        //   tree(code_tree_ptr->left->left, code_lex[i].brace_argument,
+        //        code_lex[i].brace_length);
+        //   code_tree_ptr->right->back = code_tree_ptr;
+        //   code_tree_ptr->right->left = malloc(sizeof(node));
+        //   code_tree_ptr->right->right = malloc(sizeof(node));
+        //   code_tree_ptr->right->type = PROGRAM;
+        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
+        //   1); return;
+        // } else
+        //   break;
+        return;
       }
 
     case '.': {
@@ -1762,9 +2015,10 @@ void print_tree(node *root, size_t tabs) {
   for (int i = 0; i < tabs; i++)
     printf("   ");
   printf("left type: %d", root->left->type);
-  if (root->left->type == LITERAL){
-	  printf("  -- %s\n", root->left->token_argument->string_argument);
-  } else printf("\n");
+  if (root->left->type == LITERAL) {
+    printf("  -- %s\n", root->left->token_argument->string_argument);
+  } else
+    printf("\n");
 
   if (root->left->type != LITERAL && root->left->type != END)
     print_tree(root->left, tabs + 1);
@@ -1772,1034 +2026,1082 @@ void print_tree(node *root, size_t tabs) {
   for (int i = 0; i < tabs; i++)
     printf("   ");
   printf("right type: %d", root->right->type);
-  if (root->right->type == LITERAL){
-	  printf("  -- %s\n", root->right->token_argument->string_argument);
-  } else printf("\n");
+  if (root->right->type == LITERAL) {
+    printf("  -- %s\n", root->right->token_argument->string_argument);
+  } else
+    printf("\n");
 
   if (root->right->type != LITERAL && root->right->type != END)
     print_tree(root->right, tabs + 1);
 }
 
 void init_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '=';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '=';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("INIT: %s = %s\n", left->name, right->name);
 }
 
 void assign_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '=';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '=';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s\n", left->name, right->name);
 }
 
 void mul_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '*';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: %s * %s\n", left->name, right->name);
-	else 
-  printf("SSA: %s * %s\n", left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '*';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: %s * %s\n", left->name, right->name);
+  else
+    printf("SSA: %s * %s\n", left->name, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void iter_mul_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '*' + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: SSA * %s\n", left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '*' + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: SSA * %s\n", left->name);
 }
 
 void sub_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '-';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: %s - %s\n", left->name, right->name);
-	else 
-  printf("SSA: %s - %s\n", left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '-';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: %s - %s\n", left->name, right->name);
+  else
+    printf("SSA: %s - %s\n", left->name, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void iter_sub_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '-' + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: SSA - %s\n", left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '-' + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: SSA - %s\n", left->name);
 }
 
 void div_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '/';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: %s / %s\n", left->name, right->name);
-	else 
-  printf("SSA: %s / %s\n", left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '/';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: %s / %s\n", left->name, right->name);
+  else
+    printf("SSA: %s / %s\n", left->name, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void iter_div_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '/' + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: SSA / %s\n", left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '/' + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: SSA / %s\n", left->name);
 }
 
 void mod_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '%';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: %s %c %s\n", left->name, '%', right->name);
-	else 
-  printf("SSA: %s %c %s\n", left->name, '%', right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '%';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: %s %c %s\n", left->name, '%', right->name);
+  else
+    printf("SSA: %s %c %s\n", left->name, '%', right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void iter_mod_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '%' + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: SSA %c %s\n", '%', left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '%' + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: SSA %c %s\n", '%', left->name);
 }
 
 void add_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '+';
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: %s + %s\n", left->name, right->name);
-	else 
-  printf("SSA: %s + %s\n", left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '+';
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: %s + %s\n", left->name, right->name);
+  else
+    printf("SSA: %s + %s\n", left->name, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void iter_add_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = '+' + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: SSA + %s\n", left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = '+' + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: SSA + %s\n", left->name);
 }
 
 void minus_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("-="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("-=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s - %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void mul_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("*="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("*=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s * %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void div_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("/="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("/=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s / %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void mod_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("%="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("%=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s %c %s\n", left->name, left->name, '%', right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 void shleft_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("<<="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("<<=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s << %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void shright_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol(">>="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol(">>=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s >> %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void or_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("|="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("|=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s | %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
-
 void xor_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("^="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("^=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s ^ %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void and_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("&="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("&=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s & %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void plus_equal_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("+="); 
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("+=");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
   printf("ASSIGN: %s = %s + %s\n", left->name, left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void logor_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("||");
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: (BOOL) %s || %s\n", left->name, right->name);
-	else 
-  printf("SSA: (BOOL) %s || %s\n", left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("||");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: (BOOL) %s || %s\n", left->name, right->name);
+  else
+    printf("SSA: (BOOL) %s || %s\n", left->name, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
 void iter_logor_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("||") + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: (BOOL) SSA || %s\n",  left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("||") + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: (BOOL) SSA || %s\n", left->name);
 }
-
 
 void logand_dynIR(variable *left, variable *right) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("&&");
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA: (BOOL) %s && %s\n", left->name, right->name);
-	else 
-  printf("SSA: (BOOL) %s && %s\n", left->name, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("&&");
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA: (BOOL) %s && %s\n", left->name, right->name);
+  else
+    printf("SSA: (BOOL) %s && %s\n", left->name, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
-void displaced_unary_dynIR(int disp, char* symbol, variable *left, char* paren) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol(symbol) + disp ? strlen(symbol) > 1 : symbol[0] + disp;
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 )
-  printf("NEW SSA:%s %s %s\n",paren, symbol, left->name);
-	else 
-  printf("SSA:%s %s %s\n",paren, symbol, left->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+void displaced_unary_dynIR(int disp, char *symbol, variable *left,
+                           char *paren) {
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id =
+      get_symbol(symbol) + disp ? strlen(symbol) > 1 : symbol[0] + disp;
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0)
+    printf("NEW SSA:%s %s %s\n", paren, symbol, left->name);
+  else
+    printf("SSA:%s %s %s\n", paren, symbol, left->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
-void unary_dynIR(char* symbol, variable *left, char* paren) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 )
-  printf("NEW SSA:%s %s %s\n",paren, symbol, left->name);
-	else 
-  printf("SSA:%s %s %s\n",paren, symbol, left->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
-}
-
-void general_dynIR(char* symbol, variable *left, variable *right, char* paren) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
-	new_assignment->args = malloc(sizeof(variable*) * 2);
-	new_assignment->args[0] = left;
-	new_assignment->args[1] = right;
-	new_assignment->args_len = 2;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-	if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
-  printf("NEW SSA:%s %s %s %s\n", paren, left->name, symbol, right->name);
-	else 
-  printf("SSA:%s %s %s %s\n", paren, left->name, symbol, right->name);
- /* int i = program_length - 2;
-  while (i >= 0 && program[i]->id >= 1000){
-  	printf("SSA: SSA + %s\n", left->name);
-	i--;
-  }*/
+void unary_dynIR(char *symbol, variable *left, char *paren) {
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0)
+    printf("NEW SSA:%s %s %s\n", paren, symbol, left->name);
+  else
+    printf("SSA:%s %s %s\n", paren, symbol, left->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
 }
 
-void iter_general_dynIR(char* symbol, variable *left, char* paren) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol(symbol) + 1000 ? strlen(symbol) > 1 : symbol[0] + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA:%s SSA %s %s\n", paren, symbol, left->name);
+void general_dynIR(char *symbol, variable *left, variable *right, char *paren) {
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol(symbol) ? strlen(symbol) > 1 : symbol[0];
+  new_assignment->args = malloc(sizeof(variable *) * 2);
+  new_assignment->args[0] = left;
+  new_assignment->args[1] = right;
+  new_assignment->args_len = 2;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  if (strcmp(left->name, "SSA") != 0 && strcmp(right->name, "SSA") != 0)
+    printf("NEW SSA:%s %s %s %s\n", paren, left->name, symbol, right->name);
+  else
+    printf("SSA:%s %s %s %s\n", paren, left->name, symbol, right->name);
+  /* int i = program_length - 2;
+   while (i >= 0 && program[i]->id >= 1000){
+         printf("SSA: SSA + %s\n", left->name);
+         i--;
+   }*/
+}
+
+void iter_general_dynIR(char *symbol, variable *left, char *paren) {
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol(symbol) + 1000
+                           ? strlen(symbol) > 1
+                           : symbol[0] + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA:%s SSA %s %s\n", paren, symbol, left->name);
 }
 
 void iter_logand_dynIR(variable *left) {
-	instruction* new_assignment = malloc(sizeof(instruction));
-	new_assignment->id = get_symbol("&&") + 1000; // +1000 means iterative
-	new_assignment->args = malloc(sizeof(variable*) * 1);
-	new_assignment->args[0] = left;
-	new_assignment->args_len = 1;
-	program_length++;
-	program = realloc(program, sizeof(instruction*) * (program_length));
-	program[program_length - 1] = new_assignment;
-  	printf("SSA: (BOOL) SSA && %s\n",  left->name);
+  instruction *new_assignment = malloc(sizeof(instruction));
+  new_assignment->id = get_symbol("&&") + 1000; // +1000 means iterative
+  new_assignment->args = malloc(sizeof(variable *) * 1);
+  new_assignment->args[0] = left;
+  new_assignment->args_len = 1;
+  program_length++;
+  program = realloc(program, sizeof(instruction *) * (program_length));
+  program[program_length - 1] = new_assignment;
+  printf("SSA: (BOOL) SSA && %s\n", left->name);
 }
 
-variable *evaluate(node *root, variable* high_var, int id) {
-	if (root->type == PROGRAM){
-		variable* to_return = evaluate(root->left, high_var, id);
-		evaluate(root->right, high_var, id);
-		return to_return;
-	} else if (root->type == LITERAL){
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = root->token_argument->string_argument;
-		if (root->token_argument->type == WORD){
-			for (int i = 0; i < variable_list_length; i++){
-				if (high_var != NULL && strcmp(variable_list[i]->name, new_var->name) == 0 && variable_list[i]->memtype == 1 && *(variable_list[i]->scope_to_destroy) < *(high_var->scope_to_destroy)){
-					variable_list[i]->scope_to_destroy = (high_var->scope_to_destroy);
-				} // basically, when inserting frees at the end, check the scope_to_destroy to see when to actually free the variable. however, the actual scope is the actual scope its defined in so errors can work.
-				else if (strcmp(variable_list[i]->name, new_var->name) == 0) return (variable_list[i]);
-			}
+variable *evaluate(node *root, variable *high_var, int id) {
+  if (root->type == PROGRAM) {
+    variable *to_return = evaluate(root->left, high_var, id);
+    evaluate(root->right, high_var, id);
+    return to_return;
+  } else if (root->type == LITERAL) {
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = root->token_argument->string_argument;
+    if (root->token_argument->type == WORD) {
+      for (int i = 0; i < variable_list_length; i++) {
+        if (high_var != NULL &&
+            strcmp(variable_list[i]->name, new_var->name) == 0 &&
+            variable_list[i]->memtype == 1 &&
+            *(variable_list[i]->scope_to_destroy) <
+                *(high_var->scope_to_destroy)) {
+          variable_list[i]->scope_to_destroy = (high_var->scope_to_destroy);
+        } // basically, when inserting frees at the end, check the
+          // scope_to_destroy to see when to actually free the variable.
+          // however, the actual scope is the actual scope its defined in so
+          // errors can work.
+        else if (strcmp(variable_list[i]->name, new_var->name) == 0)
+          return (variable_list[i]);
+      }
 
-			if (id == '='){
-				new_var->scope = -1;
-				new_var->scope_to_destroy = malloc(sizeof(int));
-				*(new_var->scope_to_destroy) = scope; 
-			// ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
-			}
-		}
+      if (id == '=') {
+        new_var->scope = -1;
+        new_var->scope_to_destroy = malloc(sizeof(int));
+        *(new_var->scope_to_destroy) = scope;
+        // ADD TYPE DEFINITION AND MEMTYPE DEFINITION HERE PLEASEEEEEE
+      }
+    }
 
-		return new_var;
-	} else if (root->type == '='){
-		variable* left = evaluate(root->left, NULL, '=');
-		variable* right = evaluate(root->right, left, '='); 
-		
-		if (left->scope != -1){
-			assign_dynIR(left, right);
-		} else {
-			left->scope = *(left->scope_to_destroy);
-			init_dynIR(left, right);
+    return new_var;
+  } else if (root->type == '=') {
+    variable *left = evaluate(root->left, NULL, '=');
+    variable *right = evaluate(root->right, left, '=');
 
-			variable_list_length++;
-			variable_list = realloc(variable_list, variable_list_length * sizeof(variable*));
-			variable_list[variable_list_length - 1] = left;
-		}
+    if (left->scope != -1) {
+      assign_dynIR(left, right);
+    } else {
+      left->scope = *(left->scope_to_destroy);
+      init_dynIR(left, right);
 
-		return left;
-	} else if (root->type == '+'){
-		variable* left = evaluate(root->left, high_var, '+');
-		variable* right = evaluate(root->right, high_var, '+');
-		if (right == NULL) iter_add_dynIR(left);
-		else add_dynIR(left, right);
-		
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-	} else if (root->type == END){
-		return NULL;
-	} else if (root->type == '-'){
-		variable* left = evaluate(root->left, high_var, '-');
-		variable* right = evaluate(root->right, high_var, '-');
-		if (right == NULL) iter_sub_dynIR(left);
-		else sub_dynIR(left, right);
-		
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-	} else if (root->type == '*'){
-		variable* left = evaluate(root->left, high_var, '*');
-		variable* right = evaluate(root->right, high_var, '*');
-		if (right == NULL) iter_mul_dynIR(left);
-		else mul_dynIR(left, right);
-		
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-	} else if (root->type == '/'){
-		variable* left = evaluate(root->left, high_var, '/');
-		variable* right = evaluate(root->right, high_var, '/');
-		if (right == NULL) iter_div_dynIR(left);
-		else div_dynIR(left, right);
-		
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-	} else if (root->type == '%'){
-                variable* left = evaluate(root->left, high_var, '%');
-                variable* right = evaluate(root->right, high_var, '%');
-                if (right == NULL) iter_mod_dynIR(left);
-                else mod_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("+=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("+="));
-                variable* right = evaluate(root->right, high_var, get_symbol("+="));
-                plus_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("-=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("-="));
-                variable* right = evaluate(root->right, high_var, get_symbol("-="));
-                minus_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("*=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("*="));
-                variable* right = evaluate(root->right, high_var, get_symbol("*="));
-                mul_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("/=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("/="));
-                variable* right = evaluate(root->right, high_var, get_symbol("/="));
-                div_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("%=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("%="));
-                variable* right = evaluate(root->right, high_var, get_symbol("%="));
-                mod_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("<<=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("<<="));
-                variable* right = evaluate(root->right, high_var, get_symbol("<<="));
-                shleft_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol(">>=")){
-                variable* left = evaluate(root->left, high_var, get_symbol(">>="));
-                variable* right = evaluate(root->right, high_var, get_symbol(">>="));
-                shright_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("&=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("&="));
-                variable* right = evaluate(root->right, high_var, get_symbol("&="));
-                and_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("^=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("^="));
-                variable* right = evaluate(root->right, high_var, get_symbol("^="));
-                xor_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol("|=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("|="));
-                variable* right = evaluate(root->right, high_var, get_symbol("|="));
-                or_equal_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("||")){
-                variable* left = evaluate(root->left, high_var, get_symbol("||"));
-                variable* right = evaluate(root->right, high_var, get_symbol("||"));
-                if (right == NULL) iter_logor_dynIR(left);
-                else logor_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("&&")){
-                variable* left = evaluate(root->left, high_var, get_symbol("&&"));
-                variable* right = evaluate(root->right, high_var, get_symbol("&&"));
-                if (right == NULL) iter_logand_dynIR(left);
-                else logand_dynIR(left, right);
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == '|'){
-                variable* left = evaluate(root->left, high_var, '|');
-                variable* right = evaluate(root->right, high_var, '|');
-                if (right == NULL) iter_general_dynIR("|", left, "");
-                else general_dynIR("|", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == '^'){
-                variable* left = evaluate(root->left, high_var, '^');
-                variable* right = evaluate(root->right, high_var, '^');
-                if (right == NULL) iter_general_dynIR("^", left, "");
-                else general_dynIR("^", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == '&'){
-                variable* left = evaluate(root->left, high_var, '&');
-                variable* right = evaluate(root->right, high_var, '&');
-                if (right == NULL) iter_general_dynIR("&", left, "");
-                else general_dynIR("&", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("==")){
-                variable* left = evaluate(root->left, high_var, get_symbol("=="));
-                variable* right = evaluate(root->right, high_var, get_symbol("=="));
-                if (right == NULL) iter_general_dynIR("==", left, " (BOOL)");
-                else general_dynIR("==", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("!=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("!="));
-                variable* right = evaluate(root->right, high_var, get_symbol("!="));
-                if (right == NULL) iter_general_dynIR("!=", left, " (BOOL)");
-                else general_dynIR("!=", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == get_symbol(">=")){
-                variable* left = evaluate(root->left, high_var, get_symbol(">="));
-                variable* right = evaluate(root->right, high_var, get_symbol(">="));
-                if (right == NULL) iter_general_dynIR(">=", left, " (BOOL)");
-                else general_dynIR(">=", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("<=")){
-                variable* left = evaluate(root->left, high_var, get_symbol("<="));
-                variable* right = evaluate(root->right, high_var, get_symbol("<="));
-                if (right == NULL) iter_general_dynIR("<=", left, " (BOOL)");
-                else general_dynIR("<=", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }  else if (root->type == get_symbol("..")){
-                variable* left = evaluate(root->left, high_var, get_symbol(".."));
-                variable* right = evaluate(root->right, high_var, get_symbol(".."));
-                if (right == NULL) iter_general_dynIR("..", left, " (BOOL)");
-                else general_dynIR("..", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == '>'){
-                variable* left = evaluate(root->left, high_var, '>');
-                variable* right = evaluate(root->right, high_var, '>');
-                if (right == NULL) iter_general_dynIR(">", left, " (BOOL)");
-                else general_dynIR(">", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }else if (root->type == '<'){
-                variable* left = evaluate(root->left, high_var, '<');
-                variable* right = evaluate(root->right, high_var, '<');
-                if (right == NULL) iter_general_dynIR("<", left, " (BOOL)");
-                else general_dynIR("<", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("<<")){
-                variable* left = evaluate(root->left, high_var, get_symbol("<<"));
-                variable* right = evaluate(root->right, high_var, get_symbol("<<"));
-                if (right == NULL) iter_general_dynIR("<<", left, "");
-                else general_dynIR("<<", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        }  else if (root->type == get_symbol(">>")){
-                variable* left = evaluate(root->left, high_var, get_symbol(">>"));
-                variable* right = evaluate(root->right, high_var, get_symbol(">>"));
-                if (right == NULL) iter_general_dynIR(">>", left, "");
-                else general_dynIR(">>", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("!!")){
-                variable* left = evaluate(root->left, high_var, get_symbol("!!"));
-		unary_dynIR("!!", left, " (BOOL)");
-		// NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS ALREADY INPUTTED IF NECESSARY
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
+      variable_list_length++;
+      variable_list =
+          realloc(variable_list, variable_list_length * sizeof(variable *));
+      variable_list[variable_list_length - 1] = left;
+    }
 
-	} else if (root->type == get_symbol("cast")){
-                variable* left = evaluate(root->left, high_var, get_symbol("cast"));
-                variable* right = evaluate(root->right, high_var, get_symbol("cast"));
-                if (right == NULL) iter_general_dynIR("cast", left, "");
-                else general_dynIR("cast", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("bitcast")){
-                variable* left = evaluate(root->left, high_var, get_symbol("bitcast"));
-                variable* right = evaluate(root->right, high_var, get_symbol("bitcast"));
-                if (right == NULL) iter_general_dynIR("bitcast", left, "");
-                else general_dynIR("bitcast", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == get_symbol("sizeof")){
-                variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                else general_dynIR("sizeof", left, right, "");
-                     
-                variable* new_var = malloc(sizeof(variable));
-                new_var->name = malloc(4);
-                new_var->name[3] = '\0';
-                strcpy(new_var->name, "SSA");
-                return new_var;
-        } else if (root->type == '+' + 10000){
-                variable* left = evaluate(root->left, high_var, '+' + 10000);
-		displaced_unary_dynIR(10000, "+", left, "");
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-        } else if (root->type == '-' + 10000){
-                variable* left = evaluate(root->left, high_var, '-' + 10000);
-		displaced_unary_dynIR(10000, "-", left, "");
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-        } else if (root->type == '!'){
-                variable* left = evaluate(root->left, high_var, '!');
-		unary_dynIR("!", left, " (BOOL)");
-		// NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS ALREADY INPUTTED IF NECESSARY
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-        } else if (root->type == '@'){
-                variable* left = evaluate(root->left, high_var, '@');
-		unary_dynIR("@", left, "");
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-        }  else if (root->type == get_symbol("++")){
-                variable* left = evaluate(root->left, high_var, get_symbol("++"));
-		unary_dynIR("++", left, "");
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-        }else if (root->type == get_symbol("--")){
-                variable* left = evaluate(root->left, high_var, get_symbol("--"));
-		unary_dynIR("--", left, "");
-		variable* new_var = malloc(sizeof(variable));
-		new_var->name = malloc(4);
-		new_var->name[3] = '\0';
-		strcpy(new_var->name, "SSA");
-		return new_var;
-        }else if (root->type == '('){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
-        }else if (root->type == '['){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
-        }else if (root->type == '{'){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
-        
-        }else if (root->type == BRACE_PAREN){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
+    return left;
+  } else if (root->type == '+') {
+    variable *left = evaluate(root->left, high_var, '+');
+    variable *right = evaluate(root->right, high_var, '+');
+    if (right == NULL)
+      iter_add_dynIR(left);
+    else
+      add_dynIR(left, right);
 
-        }else if (root->type == BRACK_PAREN){
-                // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
-                // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
-                // if (right == NULL) iter_general_dynIR("sizeof", left, "");
-                // else general_dynIR("sizeof", left, right);
-                     
-                // variable* new_var = malloc(sizeof(variable));
-                // new_var->name = malloc(4);
-                // new_var->name[3] = '\0';
-                // strcpy(new_var->name, "SSA");
-                // return new_var;
-	}
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == END) {
+    return NULL;
+  } else if (root->type == '-') {
+    variable *left = evaluate(root->left, high_var, '-');
+    variable *right = evaluate(root->right, high_var, '-');
+    if (right == NULL)
+      iter_sub_dynIR(left);
+    else
+      sub_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '*') {
+    variable *left = evaluate(root->left, high_var, '*');
+    variable *right = evaluate(root->right, high_var, '*');
+    if (right == NULL)
+      iter_mul_dynIR(left);
+    else
+      mul_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '/') {
+    variable *left = evaluate(root->left, high_var, '/');
+    variable *right = evaluate(root->right, high_var, '/');
+    if (right == NULL)
+      iter_div_dynIR(left);
+    else
+      div_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '%') {
+    variable *left = evaluate(root->left, high_var, '%');
+    variable *right = evaluate(root->right, high_var, '%');
+    if (right == NULL)
+      iter_mod_dynIR(left);
+    else
+      mod_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("+=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("+="));
+    variable *right = evaluate(root->right, high_var, get_symbol("+="));
+    plus_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("-=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("-="));
+    variable *right = evaluate(root->right, high_var, get_symbol("-="));
+    minus_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("*=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("*="));
+    variable *right = evaluate(root->right, high_var, get_symbol("*="));
+    mul_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("/=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("/="));
+    variable *right = evaluate(root->right, high_var, get_symbol("/="));
+    div_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("%=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("%="));
+    variable *right = evaluate(root->right, high_var, get_symbol("%="));
+    mod_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("<<=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("<<="));
+    variable *right = evaluate(root->right, high_var, get_symbol("<<="));
+    shleft_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol(">>=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol(">>="));
+    variable *right = evaluate(root->right, high_var, get_symbol(">>="));
+    shright_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("&=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("&="));
+    variable *right = evaluate(root->right, high_var, get_symbol("&="));
+    and_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("^=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("^="));
+    variable *right = evaluate(root->right, high_var, get_symbol("^="));
+    xor_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("|=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("|="));
+    variable *right = evaluate(root->right, high_var, get_symbol("|="));
+    or_equal_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("||")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("||"));
+    variable *right = evaluate(root->right, high_var, get_symbol("||"));
+    if (right == NULL)
+      iter_logor_dynIR(left);
+    else
+      logor_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("&&")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("&&"));
+    variable *right = evaluate(root->right, high_var, get_symbol("&&"));
+    if (right == NULL)
+      iter_logand_dynIR(left);
+    else
+      logand_dynIR(left, right);
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '|') {
+    variable *left = evaluate(root->left, high_var, '|');
+    variable *right = evaluate(root->right, high_var, '|');
+    if (right == NULL)
+      iter_general_dynIR("|", left, "");
+    else
+      general_dynIR("|", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '^') {
+    variable *left = evaluate(root->left, high_var, '^');
+    variable *right = evaluate(root->right, high_var, '^');
+    if (right == NULL)
+      iter_general_dynIR("^", left, "");
+    else
+      general_dynIR("^", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '&') {
+    variable *left = evaluate(root->left, high_var, '&');
+    variable *right = evaluate(root->right, high_var, '&');
+    if (right == NULL)
+      iter_general_dynIR("&", left, "");
+    else
+      general_dynIR("&", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("==")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("=="));
+    variable *right = evaluate(root->right, high_var, get_symbol("=="));
+    if (right == NULL)
+      iter_general_dynIR("==", left, " (BOOL)");
+    else
+      general_dynIR("==", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("!=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("!="));
+    variable *right = evaluate(root->right, high_var, get_symbol("!="));
+    if (right == NULL)
+      iter_general_dynIR("!=", left, " (BOOL)");
+    else
+      general_dynIR("!=", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol(">=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol(">="));
+    variable *right = evaluate(root->right, high_var, get_symbol(">="));
+    if (right == NULL)
+      iter_general_dynIR(">=", left, " (BOOL)");
+    else
+      general_dynIR(">=", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("<=")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("<="));
+    variable *right = evaluate(root->right, high_var, get_symbol("<="));
+    if (right == NULL)
+      iter_general_dynIR("<=", left, " (BOOL)");
+    else
+      general_dynIR("<=", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("..")) {
+    variable *left = evaluate(root->left, high_var, get_symbol(".."));
+    variable *right = evaluate(root->right, high_var, get_symbol(".."));
+    if (right == NULL)
+      iter_general_dynIR("..", left, " (BOOL)");
+    else
+      general_dynIR("..", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '>') {
+    variable *left = evaluate(root->left, high_var, '>');
+    variable *right = evaluate(root->right, high_var, '>');
+    if (right == NULL)
+      iter_general_dynIR(">", left, " (BOOL)");
+    else
+      general_dynIR(">", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '<') {
+    variable *left = evaluate(root->left, high_var, '<');
+    variable *right = evaluate(root->right, high_var, '<');
+    if (right == NULL)
+      iter_general_dynIR("<", left, " (BOOL)");
+    else
+      general_dynIR("<", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("<<")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("<<"));
+    variable *right = evaluate(root->right, high_var, get_symbol("<<"));
+    if (right == NULL)
+      iter_general_dynIR("<<", left, "");
+    else
+      general_dynIR("<<", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol(">>")) {
+    variable *left = evaluate(root->left, high_var, get_symbol(">>"));
+    variable *right = evaluate(root->right, high_var, get_symbol(">>"));
+    if (right == NULL)
+      iter_general_dynIR(">>", left, "");
+    else
+      general_dynIR(">>", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("!!")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("!!"));
+    unary_dynIR("!!", left, " (BOOL)");
+    // NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS
+    // ALREADY INPUTTED IF NECESSARY
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+
+  } else if (root->type == get_symbol("cast")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("cast"));
+    variable *right = evaluate(root->right, high_var, get_symbol("cast"));
+    if (right == NULL)
+      iter_general_dynIR("cast", left, "");
+    else
+      general_dynIR("cast", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("bitcast")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("bitcast"));
+    variable *right = evaluate(root->right, high_var, get_symbol("bitcast"));
+    if (right == NULL)
+      iter_general_dynIR("bitcast", left, "");
+    else
+      general_dynIR("bitcast", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("sizeof")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("sizeof"));
+    variable *right = evaluate(root->right, high_var, get_symbol("sizeof"));
+    if (right == NULL)
+      iter_general_dynIR("sizeof", left, "");
+    else
+      general_dynIR("sizeof", left, right, "");
+
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '+' + 10000) {
+    variable *left = evaluate(root->left, high_var, '+' + 10000);
+    displaced_unary_dynIR(10000, "+", left, "");
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '-' + 10000) {
+    variable *left = evaluate(root->left, high_var, '-' + 10000);
+    displaced_unary_dynIR(10000, "-", left, "");
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '!') {
+    variable *left = evaluate(root->left, high_var, '!');
+    unary_dynIR("!", left, " (BOOL)");
+    // NO ITERATIVE NEEDED, UNARY WILL ALWAYS HAVE AN ARGUMENT, AND SSA IS
+    // ALREADY INPUTTED IF NECESSARY
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '@') {
+    variable *left = evaluate(root->left, high_var, '@');
+    unary_dynIR("@", left, "");
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("++")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("++"));
+    unary_dynIR("++", left, "");
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == get_symbol("--")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("--"));
+    unary_dynIR("--", left, "");
+    variable *new_var = malloc(sizeof(variable));
+    new_var->name = malloc(4);
+    new_var->name[3] = '\0';
+    strcpy(new_var->name, "SSA");
+    return new_var;
+  } else if (root->type == '(') {
+    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+    // else general_dynIR("sizeof", left, right);
+
+    // variable* new_var = malloc(sizeof(variable));
+    // new_var->name = malloc(4);
+    // new_var->name[3] = '\0';
+    // strcpy(new_var->name, "SSA");
+    // return new_var;
+  } else if (root->type == '[') {
+    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+    // else general_dynIR("sizeof", left, right);
+
+    // variable* new_var = malloc(sizeof(variable));
+    // new_var->name = malloc(4);
+    // new_var->name[3] = '\0';
+    // strcpy(new_var->name, "SSA");
+    // return new_var;
+  } else if (root->type == '{') {
+    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+    // else general_dynIR("sizeof", left, right);
+
+    // variable* new_var = malloc(sizeof(variable));
+    // new_var->name = malloc(4);
+    // new_var->name[3] = '\0';
+    // strcpy(new_var->name, "SSA");
+    // return new_var;
+
+  } else if (root->type == HYBRID_N) {
+    // variable* left = evaluate(root->left, high_var, get_symbol("sizeof"));
+    // variable* right = evaluate(root->right, high_var, get_symbol("sizeof"));
+    // if (right == NULL) iter_general_dynIR("sizeof", left, "");
+    // else general_dynIR("sizeof", left, right);
+
+    // variable* new_var = malloc(sizeof(variable));
+    // new_var->name = malloc(4);
+    // new_var->name[3] = '\0';
+    // strcpy(new_var->name, "SSA");
+    // return new_var;
+  }
+  return NULL;
 }
 
 int main(int argc, char **argv) {
-  variable_list = malloc(sizeof(variable*));
+  printf("HYBRID_N ENUM - %d\n\n", HYBRID_N);
+  variable_list = malloc(sizeof(variable *));
   variable_list_length = 0;
 
-	program = malloc(sizeof(instruction*));
-	program_length = 0;
+  program = malloc(sizeof(instruction *));
+  program_length = 0;
 
   scope = 0;
 
@@ -2831,10 +3133,8 @@ int main(int argc, char **argv) {
   print_tree(root, 0);
 
   printf("\nPRINTED COMPILER IR:\n");
-evaluate(root, NULL, PROGRAM);
+  evaluate(root, NULL, PROGRAM);
 
   //    printf("%d\n%d\n", PROGRAM, code_tree_ptr->type);
   return 0;
 }
-
-
