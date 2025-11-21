@@ -11,6 +11,10 @@ My todo list for this project
 <!-- - brackets -->
 <!-- - braces -->
 - Make DynIR
+- FIX FUNCTIONS AND BRACES, RIGHT NOW THEY ARENT COMPATIBLE AND ONLY WORK ONE AT A TIME
+- Accessing functions like variables
+- Make type system
+- Make memory management system
 
 
 some info about interoperability:
