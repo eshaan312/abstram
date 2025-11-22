@@ -31,7 +31,8 @@ enum node_type {
   FUNCTION_CALL,
   LITERAL,
   END,
-  HYBRID_N
+  HYBRID_N,
+  FNDEF
 };
 
 typedef struct token_struct {
@@ -349,6 +350,7 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
   int quote_mode = 0;
   int quote_buf_start;
 
+  int fn_mode = 0;
   int paren_mode = 0;
   int brace_mode = 0;
   int colon_mode = 0;
@@ -399,6 +401,12 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
       continue;
     }
 
+    if (strncmp(&raw_code[i], "fn", 2) == 0) {
+      fn_mode++;
+      i++;
+      continue;
+    }
+
     if (paren_mode && raw_code[i] == ')') {
       paren_mode--;
 
@@ -419,10 +427,15 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
            code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
-        append_token_p(&code_lex, &code_lex_size, &code_lex_index,
-                       HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
-                       code_lex[code_lex_index].string_argument, lexed_paren,
-                       lexed_paren_index);
+
+        if (code_lex[code_lex_index].type == HYBRID)
+          append_token_p(&code_lex, &code_lex_size, &code_lex_index, HYBRID,
+                         code_lex[code_lex_index].string_argument, lexed_paren,
+                         lexed_paren_index);
+        else
+          append_token_p(&code_lex, &code_lex_size, &code_lex_index, WORD,
+                         code_lex[code_lex_index].string_argument, lexed_paren,
+                         lexed_paren_index);
       } else
         append_token_p(&code_lex, &code_lex_size, &code_lex_index, '(', NULL,
                        lexed_paren, lexed_paren_index);
@@ -457,15 +470,25 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
            code_lex[code_lex_index - 1].type == '[' ||
            code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type == HYBRID)) {
+
         code_lex_index--;
-        append_token_b(&code_lex, &code_lex_size, &code_lex_index,
-                       HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
-                       code_lex[code_lex_index].string_argument, lexed_paren,
-                       lexed_paren_index);
+
+        if (code_lex[code_lex_index].type == HYBRID)
+          append_token_b(&code_lex, &code_lex_size, &code_lex_index, HYBRID,
+                         code_lex[code_lex_index].string_argument, lexed_paren,
+                         lexed_paren_index);
+        else
+          append_token_b(&code_lex, &code_lex_size, &code_lex_index, WORD,
+                         code_lex[code_lex_index].string_argument, lexed_paren,
+                         lexed_paren_index);
       } else
         append_token_b(&code_lex, &code_lex_size, &code_lex_index, '{', NULL,
                        lexed_paren, lexed_paren_index);
 
+      if (fn_mode) {
+        fn_mode--;
+        code_lex[code_lex_index - 1].type = 'F';
+      }
       continue;
     } else if (brace_mode)
       continue;
@@ -497,10 +520,15 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
            code_lex[code_lex_index - 1].type == '{' ||
            code_lex[code_lex_index - 1].type == HYBRID)) {
         code_lex_index--;
-        append_token_bk(&code_lex, &code_lex_size, &code_lex_index,
-                        HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
-                        code_lex[code_lex_index].string_argument, lexed_paren,
-                        lexed_paren_index);
+
+        if (code_lex[code_lex_index].type == HYBRID)
+          append_token_bk(&code_lex, &code_lex_size, &code_lex_index, HYBRID,
+                          code_lex[code_lex_index].string_argument, lexed_paren,
+                          lexed_paren_index);
+        else
+          append_token_bk(&code_lex, &code_lex_size, &code_lex_index, WORD,
+                          code_lex[code_lex_index].string_argument, lexed_paren,
+                          lexed_paren_index);
       } else
         append_token_bk(&code_lex, &code_lex_size, &code_lex_index, '[', NULL,
                         lexed_paren, lexed_paren_index);
@@ -537,10 +565,14 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
            code_lex[code_lex_index - 1].type ==
                HYBRID)) { // if its able to attach to the last token
         code_lex_index--;
-        append_token_c(&code_lex, &code_lex_size, &code_lex_index,
-                       HYBRID ? code_lex[code_lex_index].type == HYBRID : WORD,
-                       code_lex[code_lex_index].string_argument, lexed_paren,
-                       lexed_paren_index);
+        if (code_lex[code_lex_index].type == HYBRID)
+          append_token_c(&code_lex, &code_lex_size, &code_lex_index, HYBRID,
+                         code_lex[code_lex_index].string_argument, lexed_paren,
+                         lexed_paren_index);
+        else
+          append_token_c(&code_lex, &code_lex_size, &code_lex_index, WORD,
+                         code_lex[code_lex_index].string_argument, lexed_paren,
+                         lexed_paren_index);
       } else
         continue;
 
@@ -1760,6 +1792,62 @@ void tree(node *code_tree_ptr, token *code_lex, int code_lex_index) {
       return;
     }
 
+    case 'F':
+      printf("%s\n", code_lex[i].order);
+      // ok so this is gonna handle attached parens, brackets, and braces.
+      // the evaluator can handle colons itself.
+      {
+        // create left HYBRID_N node
+        code_tree_ptr->left->type = FNDEF;
+        code_tree_ptr->left->name = code_lex[i].string_argument;
+        node *parent = code_tree_ptr->left;
+        int parens = 0;
+        int bracks = 0;
+        int braces = 0;
+
+        for (int x = 0; x < strlen(code_lex[i].order); x++) {
+          parent->left = malloc(sizeof(node));
+          parent->left->type = code_lex[i].order[x];
+          parent->left->left = malloc(sizeof(node));
+          parent->left->right = malloc(sizeof(node));
+          parent->left->back = parent;
+          switch (parent->left->type) {
+          case '(':
+            tree(parent->left, code_lex[i].paren_argument[parens],
+                 code_lex[i].paren_lengths[parens]);
+            parens++;
+            break;
+          case '{':
+            tree(parent->left, code_lex[i].brace_argument[bracks],
+                 code_lex[i].brace_lengths[bracks]);
+            bracks++;
+            break;
+          case '[':
+            tree(parent->left, code_lex[i].brack_argument[braces],
+                 code_lex[i].brack_lengths[braces]);
+            braces++;
+            break;
+          }
+
+          parent->right = malloc(sizeof(node));
+          parent->right->type = FNDEF;
+          parent->right->back = parent;
+          parent->right->right = malloc(sizeof(node));
+          parent->right->left = malloc(sizeof(node));
+
+          parent = parent->right;
+        }
+        parent->type = END;
+
+        // do right continuation
+        code_tree_ptr->right->back = code_tree_ptr;
+        code_tree_ptr->right->left = malloc(sizeof(node));
+        code_tree_ptr->right->right = malloc(sizeof(node));
+        code_tree_ptr->right->type = PROGRAM;
+        tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
+
+        return;
+      }
     case HYBRID:
       // ok so this is gonna handle attached parens, brackets, and braces.
       // the evaluator can handle colons itself.
@@ -1813,165 +1901,6 @@ void tree(node *code_tree_ptr, token *code_lex, int code_lex_index) {
         code_tree_ptr->right->type = PROGRAM;
         tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i - 1);
 
-        // if (code_lex[i].token_length != 0 && code_lex[i].brack_length != 0) {
-        //   code_tree_ptr->left->name =
-        //       malloc(1 + strlen(code_lex[i].string_argument));
-        //
-        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
-        //   '\0';
-        //
-        //   code_tree_ptr->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->type = PROGRAM;
-        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->type = PROGRAM;
-        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->left = malloc(sizeof(node));
-        //
-        //   code_tree_ptr->left->type = (enum node_type)BRACK_PAREN_WORD;
-        //   code_tree_ptr->left->back = code_tree_ptr;
-        //
-        //   tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-        //        code_lex[i].token_length);
-        //   tree(code_tree_ptr->left->right, code_lex[i].brack_argument,
-        //        code_lex[i].brack_length);
-        //
-        //   code_tree_ptr->right->back = code_tree_ptr;
-        //   code_tree_ptr->right->left = malloc(sizeof(node));
-        //   code_tree_ptr->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->right->type = PROGRAM;
-        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
-        //   1); return;
-        // }
-        //
-        // else if (code_lex[i].token_length != 0 &&
-        //          code_lex[i].brace_length != 0) {
-        //   code_tree_ptr->left->name =
-        //       malloc(1 + strlen(code_lex[i].string_argument));
-        //
-        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
-        //   '\0';
-        //
-        //   code_tree_ptr->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->type = PROGRAM;
-        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->type = PROGRAM;
-        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->left = malloc(sizeof(node));
-        //
-        //   code_tree_ptr->left->type = (enum node_type)BRACE_PAREN_WORD;
-        //   code_tree_ptr->left->back = code_tree_ptr;
-        //
-        //   tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-        //        code_lex[i].token_length);
-        //   tree(code_tree_ptr->left->right, code_lex[i].brace_argument,
-        //        code_lex[i].brace_length);
-        //
-        //   code_tree_ptr->right->back = code_tree_ptr;
-        //   code_tree_ptr->right->left = malloc(sizeof(node));
-        //   code_tree_ptr->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->right->type = PROGRAM;
-        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
-        //   1); return;
-        //
-        // } else if (code_lex[i].token_length != 0) {
-        //   code_tree_ptr->left->name =
-        //       malloc(1 + strlen(code_lex[i].string_argument));
-        //
-        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
-        //   '\0';
-        //
-        //   code_tree_ptr->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->type = PROGRAM;
-        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->type = END;
-        //   code_tree_ptr->left->right->token_argument = NULL;
-        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
-        //
-        //   code_tree_ptr->left->type = (enum node_type)PAREN_WORD;
-        //   code_tree_ptr->left->back = code_tree_ptr;
-        //
-        //   tree(code_tree_ptr->left->left, code_lex[i].token_argument,
-        //        code_lex[i].token_length);
-        //   code_tree_ptr->right->back = code_tree_ptr;
-        //   code_tree_ptr->right->left = malloc(sizeof(node));
-        //   code_tree_ptr->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->right->type = PROGRAM;
-        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
-        //   1); return;
-        // } else if (code_lex[i].brack_length != 0) {
-        //   code_tree_ptr->left->name =
-        //       malloc(1 + strlen(code_lex[i].string_argument));
-        //
-        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
-        //   '\0';
-        //
-        //   code_tree_ptr->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->type = PROGRAM;
-        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->type = END;
-        //   code_tree_ptr->left->right->token_argument = NULL;
-        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
-        //
-        //   code_tree_ptr->left->type = (enum node_type)BRACK_WORD;
-        //   code_tree_ptr->left->back = code_tree_ptr;
-        //
-        //   tree(code_tree_ptr->left->left, code_lex[i].brack_argument,
-        //        code_lex[i].brack_length);
-        //   code_tree_ptr->right->back = code_tree_ptr;
-        //   code_tree_ptr->right->left = malloc(sizeof(node));
-        //   code_tree_ptr->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->right->type = PROGRAM;
-        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
-        //   1); return;
-        // } else if (code_lex[i].brace_length != 0) {
-        //   code_tree_ptr->left->name =
-        //       malloc(1 + strlen(code_lex[i].string_argument));
-        //
-        //   strcpy(code_tree_ptr->left->name, code_lex[i].string_argument);
-        //   code_tree_ptr->left->name[strlen(code_lex[i].string_argument)] =
-        //   '\0';
-        //
-        //   code_tree_ptr->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->type = PROGRAM;
-        //   code_tree_ptr->left->left->left = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->left->back = code_tree_ptr->left;
-        //   code_tree_ptr->left->right = malloc(sizeof(node));
-        //   code_tree_ptr->left->right->type = END;
-        //   code_tree_ptr->left->right->token_argument = NULL;
-        //   code_tree_ptr->left->right->back = code_tree_ptr->left;
-        //
-        //   code_tree_ptr->left->type = (enum node_type)BRACE_WORD;
-        //   code_tree_ptr->left->back = code_tree_ptr;
-        //
-        //   tree(code_tree_ptr->left->left, code_lex[i].brace_argument,
-        //        code_lex[i].brace_length);
-        //   code_tree_ptr->right->back = code_tree_ptr;
-        //   code_tree_ptr->right->left = malloc(sizeof(node));
-        //   code_tree_ptr->right->right = malloc(sizeof(node));
-        //   code_tree_ptr->right->type = PROGRAM;
-        //   tree(code_tree_ptr->right, &code_lex[i + 1], code_lex_index - i -
-        //   1); return;
-        // } else
-        //   break;
         return;
       }
 
@@ -3201,12 +3130,49 @@ variable *evaluate(node *root, variable *high_var, int id) {
       }
       }
     }
+  } else if (root->type == FNDEF) {
+    // this is the function definer
+    instruction *new_ins = malloc(sizeof(instruction));
+    new_ins->id = 'A'; // for arguments
+    new_ins->args_len = 0;
+    program_length++;
+    program = realloc(program, sizeof(instruction *) * (program_length));
+    program[program_length - 1] = new_ins;
+    printf("ARG DEF: \n");
 
-    // we just have to keep going down the HYBRID_N sub-tree until we read a
-    // scope definition with a parenthesis right behind it. until we find that,
-    // just keep evaluating everything normally, like amalgms with brackets and
-    // priority with parenthesis
+    evaluate(root->left->left, high_var, id);
+    evaluate(root->left->right, high_var, id);
+
+    instruction *new_call = malloc(sizeof(instruction));
+    new_call->id = 'F'; // for func definition
+    new_call->args_len = 0;
+    program_length++;
+    program = realloc(program, sizeof(instruction *) * (program_length));
+    program[program_length - 1] = new_call;
+    printf("DEFINE: %s\n", root->name);
+
+    instruction *new_scope = malloc(sizeof(instruction));
+    new_scope->id = '{';
+    new_scope->args_len = 0;
+    program_length++;
+    program = realloc(program, sizeof(instruction *) * (program_length));
+    program[program_length - 1] = new_scope;
+    printf("NEW SCOPE\n");
+    scope++;
+
+    evaluate(root->right->left->left, high_var, id);
+    evaluate(root->right->left->right, high_var, id);
+
+    instruction *dead_scope = malloc(sizeof(instruction));
+    dead_scope->id = '}';
+    dead_scope->args_len = 0;
+    program_length++;
+    program = realloc(program, sizeof(instruction *) * (program_length));
+    program[program_length - 1] = dead_scope;
+    printf("END SCOPE\n");
+    scope--;
   }
+
   return NULL;
 }
 
