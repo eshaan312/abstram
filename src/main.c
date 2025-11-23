@@ -442,6 +442,7 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
         append_token_p(&code_lex, &code_lex_size, &code_lex_index, '(', NULL,
                        lexed_paren, lexed_paren_index);
 
+      i--;
       continue;
     }
 
@@ -494,6 +495,7 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
         fn_mode--;
         code_lex[code_lex_index - 1].type = 'F';
       }
+      i--;
       continue;
     }
 
@@ -541,6 +543,7 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
         append_token_bk(&code_lex, &code_lex_size, &code_lex_index, '[', NULL,
                         lexed_paren, lexed_paren_index);
 
+      i--;
       continue;
     }
 
@@ -578,9 +581,8 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
           append_token_c(&code_lex, &code_lex_size, &code_lex_index, WORD,
                          code_lex[code_lex_index].string_argument, lexed_paren,
                          lexed_paren_index);
-      } else
-        continue;
-
+      }
+      i--;
       continue;
     }
 
@@ -1792,7 +1794,6 @@ void tree(node *code_tree_ptr, token *code_lex, int code_lex_index) {
     }
 
     case 'F':
-      printf("%s\n", code_lex[i].order);
       // ok so this is gonna handle attached parens, brackets, and braces.
       // the evaluator can handle colons itself.
       {
@@ -3130,6 +3131,7 @@ variable *evaluate(node *root, variable *high_var, int id) {
       }
     }
   } else if (root->type == FNDEF) {
+    // printf("\n\n\n\nTHIS HAPPENED\n\n\n\n");
     // this is the function definer
     instruction *new_ins = malloc(sizeof(instruction));
     new_ins->id = 'A'; // for arguments
