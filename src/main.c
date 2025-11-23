@@ -351,15 +351,6 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
   int quote_buf_start;
 
   int fn_mode = 0;
-  int paren_mode = 0;
-  int brace_mode = 0;
-  int colon_mode = 0;
-  int brack_mode = 0;
-  int paren_buf_start;
-  int brace_buf_start;
-  int colon_buf_start;
-  int brack_buf_start;
-
   int comment_mode = 0;
   int multi_comment_mode = 0;
 
@@ -407,8 +398,19 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
       continue;
     }
 
-    if (paren_mode && raw_code[i] == ')') {
-      paren_mode--;
+    if (raw_code[i] == '(') {
+      int paren_counter = 1;
+      i++;
+      int paren_buf_start = i;
+
+      while (paren_counter != 0) {
+        if (raw_code[i] == '(')
+          paren_counter++;
+        else if (raw_code[i] == ')')
+          paren_counter--;
+
+        i++;
+      }
 
       int buf_size = i - paren_buf_start;
       char *paren_arg =
@@ -441,18 +443,21 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
                        lexed_paren, lexed_paren_index);
 
       continue;
-    } else if (paren_mode)
-      continue;
-
-    if (!paren_mode && raw_code[i] == '(') {
-      paren_mode++;
-      paren_buf_start = i + 1;
-
-      continue;
     }
 
-    if (brace_mode && raw_code[i] == '}') {
-      brace_mode--;
+    if (raw_code[i] == '{') {
+      int paren_counter = 1;
+      i++;
+      int brace_buf_start = i;
+
+      while (paren_counter != 0) {
+        if (raw_code[i] == '{')
+          paren_counter++;
+        else if (raw_code[i] == '}')
+          paren_counter--;
+
+        i++;
+      }
 
       int buf_size = i - brace_buf_start;
       char *paren_arg =
@@ -490,18 +495,21 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
         code_lex[code_lex_index - 1].type = 'F';
       }
       continue;
-    } else if (brace_mode)
-      continue;
-
-    if (!brace_mode && raw_code[i] == '{') {
-      brace_mode++;
-      brace_buf_start = i + 1;
-
-      continue;
     }
 
-    if (brack_mode && raw_code[i] == ']') {
-      brack_mode--;
+    if (raw_code[i] == '[') {
+      int paren_counter = 1;
+      i++;
+      int brack_buf_start = i;
+
+      while (paren_counter != 0) {
+        if (raw_code[i] == '[')
+          paren_counter++;
+        else if (raw_code[i] == ']')
+          paren_counter--;
+
+        i++;
+      }
 
       int buf_size = i - brack_buf_start;
       char *paren_arg =
@@ -534,18 +542,15 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
                         lexed_paren, lexed_paren_index);
 
       continue;
-    } else if (brack_mode)
-      continue;
-
-    if (!brack_mode && raw_code[i] == '[') { // give everything different buffer
-      brack_mode++;
-      brack_buf_start = i + 1;
-
-      continue;
     }
 
-    if (colon_mode && !letter_number_underscore_or_space(raw_code[i])) {
-      colon_mode--;
+    if (raw_code[i] == ':') {
+      i++;
+      int colon_buf_start = i;
+
+      while (letter_number_underscore_or_space(raw_code[i])) {
+        i++;
+      }
 
       int buf_size = i - colon_buf_start;
       char *paren_arg =
@@ -575,14 +580,6 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
                          lexed_paren_index);
       } else
         continue;
-
-      continue;
-    } else if (colon_mode)
-      continue;
-
-    if (!colon_mode && raw_code[i] == ':') {
-      colon_mode++;
-      colon_buf_start = i + 1;
 
       continue;
     }
