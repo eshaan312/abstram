@@ -319,6 +319,14 @@ void append_token(token **code_lex, int *code_lex_size, int *code_lex_index,
   (*code_lex_index)++;
 }
 
+int tree_match(node* one, node* two, ){ // matches tree types so if/else statements
+   if (one->type == two->type){
+      if (tree_match(one->left, two->left) && tree_match(one->right, two->right))
+         return 1;
+   }
+   return 0;
+}
+
 int get_symbol(char *symbol) {
   for (int i = 0; i < LOCAL_LEN(symbols); i++) {
     if (strcmp(symbol, symbols[i]) == 0) {
