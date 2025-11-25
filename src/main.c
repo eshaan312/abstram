@@ -12,9 +12,9 @@ what, which can guarantee safety if done correctly.
 enum token_type;
 struct token_struct;
 char *symbols[] = { // sort by len of symbol
-    "bitcast", "sizeof", "cast", "<<=", ">>=", "..", "+=", "-=", "*=",
-    "=>",      "/=",     "&=",   "^=",  "|=",  "%=", "||", "&&", "==",
-    "!=",      ">=",     "<=",   "<<",  ">>",  "++", "--", "->", "!!"};
+    "bitcast", "sizeof", "cast", "<<=", ">>=", "ret", "..", "+=", "-=", "*=",
+    "=>",      "/=",     "&=",   "^=",  "|=",  "%=",  "||", "&&", "==", "!=",
+    ">=",      "<=",     "<<",   ">>",  "++",  "--",  "->", "!!"};
 #define LOCAL_LEN(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 enum node_type;
 struct node_struct;
@@ -623,6 +623,23 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
       continue;
     }
 
+    int multi_char_symbol = 0;
+
+    for (int j = 0; j < LOCAL_LEN(symbols); j++) {
+      int strlen_symbols_j = strlen(symbols[j]);
+
+      if (strncmp(&raw_code[i], symbols[j], strlen_symbols_j) == 0) {
+        append_token(&code_lex, &code_lex_size, &code_lex_index, 128 + j, NULL,
+                     NULL);
+        i += strlen_symbols_j - 1;
+        multi_char_symbol++;
+        break;
+      }
+    }
+
+    if (multi_char_symbol)
+      continue;
+
     type = WORD;
     int word_start = i;
 
@@ -645,22 +662,6 @@ token *lex(char *raw_code, int strlen_argv_1, int *code_lex_index_ptr) {
     if (raw_code[i] == ' ' || raw_code[i] == '\t')
       continue;
 
-    int multi_char_symbol = 0;
-
-    for (int j = 0; j < LOCAL_LEN(symbols); j++) {
-      int strlen_symbols_j = strlen(symbols[j]);
-
-      if (strncmp(&raw_code[i], symbols[j], strlen_symbols_j) == 0) {
-        append_token(&code_lex, &code_lex_size, &code_lex_index, 128 + j, NULL,
-                     NULL);
-        i += strlen_symbols_j - 1;
-        multi_char_symbol++;
-        break;
-      }
-    }
-
-    if (multi_char_symbol)
-      continue;
     append_token(&code_lex, &code_lex_size, &code_lex_index, raw_code[i], NULL,
                  NULL);
   }
@@ -771,10 +772,52 @@ void tree(node *code_tree_ptr, token *code_lex, int code_lex_index) {
       id = '=';
     else if (code_lex[i].type == get_symbol("|="))
       id = '=';
+    else if (code_lex[i].type == get_symbol("ret"))
+      id = 'R';
     else
       id = code_lex[i].type;
 
     switch (id) {
+    case 'R': { // USES NEWLINES FOR ASSIGNMENTS
+      int restore_i = i;
+      while (i != -1 && code_lex[i].type != '\n') {
+        i--;
+      }
+
+      i++;
+      code_tree_ptr->left->left = malloc(sizeof(node));
+      code_tree_ptr->left->left->type = PROGRAM;
+      code_tree_ptr->left->left->left = malloc(sizeof(node));
+      code_tree_ptr->left->left->right = malloc(sizeof(node));
+      code_tree_ptr->left->left->back = code_tree_ptr->left;
+      code_tree_ptr->left->right = malloc(sizeof(node));
+      code_tree_ptr->left->right->type = END;
+      code_tree_ptr->left->right->back = code_tree_ptr->left;
+      code_tree_ptr->left->right->right = malloc(sizeof(node));
+      code_tree_ptr->left->right->left = malloc(sizeof(node));
+
+      i = restore_i;
+      while (i != code_lex_index && code_lex[i].type != '\n') {
+        i++;
+      }
+
+      int i_minus_restore_i = i - restore_i - 1;
+      token *right_token_argument = malloc(sizeof(token) * (i_minus_restore_i));
+      memcpy(right_token_argument, &code_lex[restore_i + 1],
+             sizeof(token) * (i_minus_restore_i));
+
+      code_tree_ptr->left->type = (enum node_type)code_lex[restore_i].type;
+      code_tree_ptr->left->back = code_tree_ptr;
+
+      tree(code_tree_ptr->left->left, right_token_argument, i_minus_restore_i);
+
+      code_tree_ptr->right->back = code_tree_ptr;
+      code_tree_ptr->right->left = malloc(sizeof(node));
+      code_tree_ptr->right->right = malloc(sizeof(node));
+      code_tree_ptr->right->type = PROGRAM;
+      tree(code_tree_ptr->right, &code_lex[i], code_lex_index - i);
+      return;
+    }
     case '=': { // USES NEWLINES FOR ASSIGNMENTS
       int restore_i = i;
       while (i != -1 && code_lex[i].type != '\n') {
@@ -2978,6 +3021,19 @@ variable *evaluate(node *root, variable *high_var, int id) {
     new_var->name[3] = '\0';
     strcpy(new_var->name, "SSA");
     return new_var;
+  } else if (root->type == get_symbol("ret")) {
+    variable *left = evaluate(root->left, high_var, get_symbol("ret"));
+    instruction *new_return = malloc(sizeof(instruction));
+    new_return->id = get_symbol("ret");
+    new_return->args = malloc(sizeof(variable *));
+    new_return->args[0] = left;
+    new_return->args_len = 1;
+    program_length++;
+    program = realloc(program, sizeof(instruction *) * (program_length));
+    program[program_length - 1] = new_return;
+    printf("RETURN: %s\n", left->name);
+    return left;
+
   } else if (root->type == get_symbol("!!")) {
     variable *left = evaluate(root->left, high_var, get_symbol("!!"));
     unary_dynIR("!!", left, " (BOOL)");
