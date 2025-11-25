@@ -2209,7 +2209,8 @@ void minus_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s - %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s - %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2227,7 +2228,8 @@ void mul_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s * %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s * %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2245,7 +2247,8 @@ void div_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s / %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s / %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2263,7 +2266,8 @@ void mod_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s %c %s\n", left->name, left->name, '%', right->name);
+  printf("NEW SSA: %s %c %s\nASSIGN: %s = SSA\n", left->name, '%', right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2280,7 +2284,8 @@ void shleft_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s << %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s << %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2298,7 +2303,8 @@ void shright_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s >> %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s >> %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2316,7 +2322,8 @@ void or_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s | %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s | %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2334,7 +2341,8 @@ void xor_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s ^ %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s ^ %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2352,7 +2360,8 @@ void and_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s & %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s & %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
@@ -2370,7 +2379,8 @@ void plus_equal_dynIR(variable *left, variable *right) {
   program_length++;
   program = realloc(program, sizeof(instruction *) * (program_length));
   program[program_length - 1] = new_assignment;
-  printf("ASSIGN: %s = %s + %s\n", left->name, left->name, right->name);
+  printf("NEW SSA: %s + %s\nASSIGN: %s = SSA\n", left->name, right->name,
+         left->name);
   /* int i = program_length - 2;
    while (i >= 0 && program[i]->id >= 1000){
          printf("SSA: SSA + %s\n", left->name);
