@@ -37,7 +37,7 @@ xmm1 = 9, 10, 11
 ecx int
 
 # for loops
-for ecx = 0, ecx > 7, ecx++ {
+for ecx = 0, ecx > 7, inc ecx {
 
         # this will pratt parse and then add 253 to the first number in xmm0
         xmm0[0] += 55 + 6 * 33
@@ -61,7 +61,7 @@ for ecx = 0, ecx > 7, ecx++ {
 stack[0] = 0
 
 # will run multi threaded
-compiler.parallel_for ecx = 0, ecx > 7, ecx++ {
+compiler.parallel_for ecx = 0, ecx > 7, inc ecx {
 
         # all operations on memory here are locked
         stack[0] += ecx
