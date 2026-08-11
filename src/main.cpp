@@ -23,7 +23,6 @@ void eval_word(std::string &current_word, std::vector<token> &source_lex,
     return;
   }
 
-  std::cout << current_word << '\n';
   source_lex.push_back({type, current_word});
 }
 
