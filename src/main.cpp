@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-enum class lex_type { symbol, word, number };
+enum class lex_type { symbol, word, number, newline };
 
 struct token {
   lex_type type;
@@ -54,6 +54,7 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
         } else if (j == source[i].size() - 1) {
           current_word += source[i][j];
           eval_word(current_word, source_lex, current_mode);
+          source_lex.push_back({lex_type::newline, ""});
           current_word = "";
 
         } else {
@@ -83,6 +84,7 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
         } else if (j == source[i].size() - 1) {
           current_word += source[i][j];
           eval_word(current_word, source_lex, current_mode);
+          source_lex.push_back({lex_type::newline, ""});
           current_word = "";
 
         } else {
@@ -112,12 +114,16 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
         } else if (j == source[i].size() - 1) {
           current_word += source[i][j];
           eval_word(current_word, source_lex, current_mode);
+          source_lex.push_back({lex_type::newline, ""});
           current_word = "";
 
         } else {
           current_word += source[i][j];
         }
 
+        break;
+
+      default:
         break;
       }
     }
