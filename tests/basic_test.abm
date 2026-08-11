@@ -1,9 +1,29 @@
-# language is case-insensitive
+# stuff to know about the abstram language:
+# it is case insensitive
+# every type is 32 bits
+# data in memory doesn't have types
+# data in memory DOES have sizes
+
+# bootloader and multi-core and graphics setup
+run compiler.runtime
+
+# init stack
+data {
+        stack alloc compiler.calculator(1 * 1000 * 1000 * 1000)
+        stack_top label
+
+        field alloc compiler.calculator(1 * 1000 * 1000 * 1000)
+        field_top label
+}
+copy esp stack_top
+copy ebp esp
+
+# insert assembly
+compiler.assembly <- "; example assembly code (comment)"
 
 # <<- means bring in file name, not just string
-asm <<- "bootloader.asm"
-abm <<- "kernel_init.abm"
-abm <<- "graphics.abm"
+# treats these files like their text is in this file
+compiler.abstram <<- "./some_script.abm"
 
 # can be float or int too
 xmm0 float
@@ -38,11 +58,51 @@ for ecx = 0, ecx > 7, ecx++ {
         xmm1[2] += eax
 }
 
-# this is how you use the stack
-stack[0] int
+stack[0] = 0
+
+# will run multi threaded
+compiler.parallel_for ecx = 0, ecx > 7, ecx++ {
+
+        # all operations on memory here are locked
+        stack[0] += ecx
+}
+
 
 # the types match so you can do this
 stack[0] = 55 + ecx
+
+# functions: everything in the list is actually discluded from the function
+# and copied to other registers or stack
+# when the function is over they're moved back
+# new temporary stack is also created
+fn do_random_things : eax int, ebx int, ecx int, xmm1 int {
+        eax = 21
+        copy eax field[0]
+
+        # this won't compile
+        copy xmm1 field[1]
+
+        # this will, field[1, 2, 3, 4] is the same size (memory x4) as xmm1 (float x4)
+        copy xmm1 field[1, 2, 3, 4]
+}
+
+# run the function
+run do_random_things
+
+# inline functions work the same but are inlined obvi
+il do_random_things_two : eax int, ebx int, ecx int, xmm1 int {
+        eax = 21
+        copy eax field[0]
+
+        # this won't compile
+        copy xmm1 field[1]
+
+        # this will, field[1, 2, 3, 4] is the same size (memory x4) as xmm1 (float x4)
+        copy xmm1 field[1, 2, 3, 4]
+}
+
+# run the inline function
+run do_random_things_two
 
 # if statements
 if stack[0] >= xmm1[1] && ecx == 6 {
@@ -50,5 +110,4 @@ if stack[0] >= xmm1[1] && ecx == 6 {
         # will go into xmm3[0]
         ecx to xmm3 float
 }
-
 
