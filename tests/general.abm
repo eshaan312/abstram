@@ -5,7 +5,7 @@
 # data in memory DOES have sizes
 
 # bootloader and multi-core and graphics setup
-run compiler.runtime
+run runtime.init
 
 # init stack
 data {
@@ -61,7 +61,7 @@ for ecx = 0, ecx > 7, inc ecx {
 stack[0] = 0
 
 # will run multi threaded
-compiler.parallel_for ecx = 0, ecx > 7, inc ecx {
+runtime.parallel_for ecx = 0, ecx > 7, inc ecx {
 
         # all operations on memory here are locked
         stack[0] += ecx
