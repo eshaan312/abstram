@@ -9,11 +9,11 @@ run runtime.init
 
 # init stack
 data {
-        stack alloc compiler.calculator(1 * 1000 * 1000 * 1000)
-        stack_top label
+        stack: alloc compiler.calculator(1 * 1000 * 1000 * 1000)
+        stack_top: label
 
-        field alloc compiler.calculator(1 * 1000 * 1000 * 1000)
-        field_top label
+        field: alloc compiler.calculator(1 * 1000 * 1000 * 1000)
+        field_top: label
 }
 copy esp stack_top
 copy ebp esp
@@ -26,15 +26,15 @@ compiler.assembly <- "; example assembly code (comment)"
 compiler.abstram <<- "./some_script.abm"
 
 # can be float or int too
-xmm0 float
+xmm0: float
 xmm0 = 5, 6, 7, 8
 
 # will leave the fourth one as 0
-xmm1 int
+xmm1: int
 xmm1 = 9, 10, 11
 
 # can only be int
-ecx int
+ecx: int
 
 # for loops
 for ecx = 0, ecx > 7, inc ecx {
@@ -46,7 +46,7 @@ for ecx = 0, ecx > 7, inc ecx {
         xmm0 += xmm1
 
         # casts this properly while retaining the actual values of the numbers
-        xmm1 to xmm2 float
+        xmm1 to xmm2: float
 
         # this would work after the cast
         xmm0 += xmm2
@@ -108,6 +108,6 @@ run do_random_things_two
 if stack[0] >= xmm1[1] && ecx == 6 {
 
         # will go into xmm3[0]
-        ecx to xmm3 float
+        ecx to xmm3: float
 }
 
