@@ -223,18 +223,14 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
   if (line_tokens[index_of_number].load == "compiler" &&
       line_tokens[index_of_number + 1].load == "." &&
-      line_tokens[index_of_number + 2].load == "calculator") {
+      line_tokens[index_of_number + 2].load == "int_calculator") {
 
-    if (line_tokens[index_of_number + 4].load != "int" &&
-        line_tokens[index_of_number + 4].load != "float")
-      return std::unexpected("type for compiler.calculator isn't int or float");
-
-    if (line_tokens[index_of_number + 6].load != "{")
+    if (line_tokens[index_of_number + 3].load != "{")
       return std::unexpected(
-          "failed to find curly brace after compiler.calculator");
+          "failed to find curly brace after compiler.int_calculator");
 
-    int start_math = index_of_number + 7;
-    int end_math = index_of_number + 7;
+    int start_math = index_of_number + 4;
+    int end_math = index_of_number + 4;
     while (line_tokens[end_math].load != "}") {
       ++end_math;
     }
@@ -244,118 +240,130 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                          &line_tokens[end_math]};
 
     std::vector<token> rpn = to_rpn(to_do_math_on);
-    bool number_is_int;
+    std::stack<int> eval_stack;
+    for (const token t : rpn) {
+      if (t.type == lex_type::number) {
+        eval_stack.push(std::stoi(t.load));
+      } else if (t.type == lex_type::word) {
+        return std::unexpected(
+            "why is there a variable in your compiler.calculator call");
+      } else if (t.type == lex_type::symbol) {
 
-    if (line_tokens[index_of_number + 4].load == "int")
-      number_is_int = true;
+        if (t.load == "u+" || t.load == "u-") {
+          if (eval_stack.empty())
+            return std::unexpected("need more operands");
+          int val = eval_stack.top();
+          eval_stack.pop();
+          eval_stack.push(t.load == "u-" ? -val : val);
+        } else {
+          if (eval_stack.size() < 2)
+            return std::unexpected("need more operators");
 
-    if (number_is_int) {
-      std::stack<int> eval_stack;
-      for (const token t : rpn) {
-        if (t.type == lex_type::number) {
-          eval_stack.push(std::stoi(t.load));
-        } else if (t.type == lex_type::word) {
-          return std::unexpected(
-              "why is there a variable in your compiler.calculator call");
-        } else if (t.type == lex_type::symbol) {
+          int right = eval_stack.top();
+          eval_stack.pop();
+          int left = eval_stack.top();
+          eval_stack.pop();
 
-          if (t.load == "u+" || t.load == "u-") {
-            if (eval_stack.empty())
-              return std::unexpected("need more operands");
-            int val = eval_stack.top();
-            eval_stack.pop();
-            eval_stack.push(t.load == "u-" ? -val : val);
+          if (t.load == "+")
+            eval_stack.push(left + right);
+          else if (t.load == "-")
+            eval_stack.push(left - right);
+          else if (t.load == "*")
+            eval_stack.push(left * right);
+          else if (t.load == "/") {
+            if (right == 0)
+              return std::unexpected("can't divide by zero");
+            eval_stack.push(left / right);
+          } else if (t.load == "%") {
+            if (right == 0)
+              return std::unexpected("can't modulus by zero");
+            eval_stack.push(left % right);
           } else {
-            if (eval_stack.size() < 2)
-              return std::unexpected("need more operators");
-
-            int right = eval_stack.top();
-            eval_stack.pop();
-            int left = eval_stack.top();
-            eval_stack.pop();
-
-            if (t.load == "+")
-              eval_stack.push(left + right);
-            else if (t.load == "-")
-              eval_stack.push(left - right);
-            else if (t.load == "*")
-              eval_stack.push(left * right);
-            else if (t.load == "/") {
-              if (right == 0)
-                return std::unexpected("can't divide by zero");
-              eval_stack.push(left / right);
-            } else if (t.load == "%") {
-              if (right == 0)
-                return std::unexpected("can't modulus by zero");
-              eval_stack.push(left % right);
-            } else {
-              return std::unexpected("what is this: " + t.load);
-            }
+            return std::unexpected("what is this: " + t.load);
           }
         }
       }
-
-      if (eval_stack.size() != 1)
-        return std::unexpected("couldn't figure it out");
-      return std::to_string(eval_stack.top());
-
-    } else { // float logic
-      std::stack<float> eval_stack;
-      for (const token t : rpn) {
-        if (t.type == lex_type::number) {
-          eval_stack.push(std::stof(t.load));
-        } else if (t.type == lex_type::word) {
-          return std::unexpected(
-              "why is there a variable in your compiler.calculator call");
-        } else if (t.type == lex_type::symbol) {
-
-          if (t.load == "u+" || t.load == "u-") {
-            if (eval_stack.empty())
-              return std::unexpected("need more operands");
-            float val = eval_stack.top();
-            eval_stack.pop();
-            eval_stack.push(t.load == "u-" ? -val : val);
-          } else {
-            if (eval_stack.size() < 2)
-              return std::unexpected("need more operators");
-
-            float right = eval_stack.top();
-            eval_stack.pop();
-            float left = eval_stack.top();
-            eval_stack.pop();
-
-            if (t.load == "+")
-              eval_stack.push(left + right);
-            else if (t.load == "-")
-              eval_stack.push(left - right);
-            else if (t.load == "*")
-              eval_stack.push(left * right);
-            else if (t.load == "/") {
-              if (right == 0.0f)
-                return std::unexpected("can't divide by zero");
-              eval_stack.push(left / right);
-            } else if (t.load == "%") {
-              if (right == 0.0f)
-                return std::unexpected("can't modulus by zero");
-              eval_stack.push(std::fmod(left, right));
-            } else {
-              return std::unexpected("what is this: " + t.load);
-            }
-          }
-        }
-      }
-
-      if (eval_stack.size() != 1)
-        return std::unexpected("couldn't figure it out");
-
-      return std::to_string(eval_stack.top());
     }
+
+    if (eval_stack.size() != 1)
+      return std::unexpected("couldn't figure it out");
+    return std::to_string(eval_stack.top());
   }
+  if (line_tokens[index_of_number].load == "compiler" &&
+      line_tokens[index_of_number + 1].load == "." &&
+      line_tokens[index_of_number + 2].load == "float_calculator") {
+    if (line_tokens[index_of_number + 3].load != "{")
+      return std::unexpected(
+          "failed to find curly brace after compiler.float_calculator");
+
+    int start_math = index_of_number + 4;
+    int end_math = index_of_number + 4;
+    while (line_tokens[end_math].load != "}") {
+      ++end_math;
+    }
+    // end_math is now equal to the index of the ending curly brace
+
+    std::span<const token> to_do_math_on{&line_tokens[start_math],
+                                         &line_tokens[end_math]};
+
+    std::vector<token> rpn = to_rpn(to_do_math_on);
+    // float logic
+    std::stack<float> eval_stack;
+    for (const token t : rpn) {
+      if (t.type == lex_type::number) {
+        eval_stack.push(std::stof(t.load));
+      } else if (t.type == lex_type::word) {
+        return std::unexpected(
+            "why is there a variable in your compiler.calculator call");
+      } else if (t.type == lex_type::symbol) {
+
+        if (t.load == "u+" || t.load == "u-") {
+          if (eval_stack.empty())
+            return std::unexpected("need more operands");
+          float val = eval_stack.top();
+          eval_stack.pop();
+          eval_stack.push(t.load == "u-" ? -val : val);
+        } else {
+          if (eval_stack.size() < 2)
+            return std::unexpected("need more operators");
+
+          float right = eval_stack.top();
+          eval_stack.pop();
+          float left = eval_stack.top();
+          eval_stack.pop();
+
+          if (t.load == "+")
+            eval_stack.push(left + right);
+          else if (t.load == "-")
+            eval_stack.push(left - right);
+          else if (t.load == "*")
+            eval_stack.push(left * right);
+          else if (t.load == "/") {
+            if (right == 0.0f)
+              return std::unexpected("can't divide by zero");
+            eval_stack.push(left / right);
+          } else if (t.load == "%") {
+            if (right == 0.0f)
+              return std::unexpected("can't modulus by zero");
+            eval_stack.push(std::fmod(left, right));
+          } else {
+            return std::unexpected("what is this: " + t.load);
+          }
+        }
+      }
+    }
+
+    if (eval_stack.size() != 1)
+      return std::unexpected("couldn't figure it out");
+
+    return std::to_string(eval_stack.top());
+  }
+
   if (line_tokens[index_of_number].load == "runtime" &&
       line_tokens[index_of_number + 1].load == "." &&
       line_tokens[index_of_number + 2].load == "calculator") {
 
-    // continue here make another rpn evaluator but outputting assembly
+    // another rpn evaluator but outputting assembly
   }
 
   return std::unexpected("couldn't figure it out");
