@@ -2,51 +2,42 @@
 # it is case insensitive
 # every type is 32 bits
 # data in memory doesn't have types
-# data in memory DOES have sizes
 
-# bootloader and multi-core and graphics setup
+# bootloader and multi-core and graphics setup and stack init
+# the stack is restricted to only being used by the compiler
+# but can be accessed via assembly insertions
 run runtime.init
 
-# init stack
-data {
-        stack: alloc compiler.calculator(1 * 1000 * 1000 * 1000)
-        stack_top: label
-
+# init general memory field
+data
         field: alloc compiler.calculator(1 * 1000 * 1000 * 1000)
-        field_top: label
-}
-copy esp stack_top
-copy ebp esp
+end
 
 # insert assembly
 compiler.assembly <- "; example assembly code (comment)"
 
-# <<- means bring in file name, not just string
-# treats these files like their text is in this file
-compiler.abstram <<- "./some_script.abm"
-
-# can be float or int too
+# can be float
 xmm0: float
 xmm0 = 5, 6, 7, 8
 
-# will leave the fourth one as 0
+# or int too
 xmm1: int
-xmm1 = 9, 10, 11
+xmm1 = 9, 10, 11, 0
 
 # can only be int
 ecx: int
 
 # for loops
-for ecx = 0, ecx > 7, inc ecx {
+for ecx = 0, runtime.calculator(ecx > 7), inc ecx
 
         # this will pratt parse and then add 253 to the first number in xmm0
-        xmm0[0] += 55 + 6 * 33
+        xmm0[0] += runtime.calculator(55 + 6 * 33)
 
         # this will not be allowed because of the types, compiler error
         xmm0 += xmm1
 
         # casts this properly while retaining the actual values of the numbers
-        xmm1 to xmm2: float
+        xmm1 -> xmm2: float
 
         # this would work after the cast
         xmm0 += xmm2
@@ -56,58 +47,41 @@ for ecx = 0, ecx > 7, inc ecx {
 
         # this will work fine because they're both ints
         xmm1[2] += eax
-}
+end
 
-stack[0] = 0
+field[0] = 0
 
 # will run multi threaded
-runtime.parallel_for ecx = 0, ecx > 7, inc ecx {
+runtime.parallel_for ecx = 0, runtime.calculator(ecx > 7), inc ecx
 
         # all operations on memory here are locked
-        stack[0] += ecx
-}
+        field[0] += ecx
+end
 
 
 # the types match so you can do this
-stack[0] = 55 + ecx
+field[0] = runtime.calculator(55 + ecx)
 
 # functions: everything in the list is actually discluded from the function
-# and copied to other registers or stack
+# and copied to other registers or field
 # when the function is over they're moved back
-# new temporary stack is also created
-fn do_random_things : eax int, ebx int, ecx int, xmm1 int {
+# inlined by default
+fn do_random_things : eax int, ebx int, ecx int, xmm1 int
         eax = 21
-        copy eax field[0]
+        field[0] = eax
 
-        # this won't compile
-        copy xmm1 field[1]
+        # moves all 4 values to field 1, 2, 3, 4
+        field[1] = xmm1
 
-        # this will, field[1, 2, 3, 4] is the same size (memory x4) as xmm1 (float x4)
-        copy xmm1 field[1, 2, 3, 4]
-}
+end
 
 # run the function
 run do_random_things
 
-# inline functions work the same but are inlined obvi
-il do_random_things_two : eax int, ebx int, ecx int, xmm1 int {
-        eax = 21
-        copy eax field[0]
-
-        # this won't compile
-        copy xmm1 field[1]
-
-        # this will, field[1, 2, 3, 4] is the same size (memory x4) as xmm1 (float x4)
-        copy xmm1 field[1, 2, 3, 4]
-}
-
-# run the inline function
-run do_random_things_two
-
 # if statements
-if stack[0] >= xmm1[1] && ecx == 6 {
+if runtime.calculator(field[0] >= xmm1[1] && ecx == 6)
 
         # will go into xmm3[0]
-        ecx to xmm3: float
-}
+        ecx -> xmm3: float
+end
 
