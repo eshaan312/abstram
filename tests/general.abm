@@ -9,9 +9,7 @@
 run runtime.init
 
 # init general memory field
-data
-        field: alloc compiler.calculator(1 * 1000 * 1000 * 1000)
-end
+field: alloc compiler.calculator (int) {1 * 1000 * 1000 * 1000}
 
 # insert assembly
 compiler.assembly <- "; example assembly code (comment)"
@@ -27,11 +25,11 @@ xmm1 = 9, 10, 11, 0
 # can only be int
 ecx: int
 
-# for loops
-for ecx = 0, runtime.calculator(ecx > 7), inc ecx
+# for loops - replace with while loops and repeat ecx, 5
+for ecx = 0, runtime.calculator{ecx > 7}, runtime.calculator{++ecx}
 
-        # this will pratt parse and then add 253 to the first number in xmm0
-        xmm0[0] += runtime.calculator(55 + 6 * 33)
+        # this will pratt parse and then add 253 or something to the first number in xmm0
+        xmm0[0] += runtime.calculator{55 + 6 * ecx}
 
         # this will not be allowed because of the types, compiler error
         xmm0 += xmm1
@@ -51,8 +49,8 @@ end
 
 field[0] = 0
 
-# will run multi threaded
-runtime.parallel_for ecx = 0, runtime.calculator(ecx > 7), inc ecx
+# will run multi threaded - replace with runtime.parallel_repeat ecx 5
+runtime.parallel_for ecx = 0, runtime.calculator(ecx > 7), runtime.calculator(++ecx)
 
         # all operations on memory here are locked
         field[0] += ecx
