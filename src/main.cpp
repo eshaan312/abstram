@@ -350,11 +350,12 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
       return std::to_string(eval_stack.top());
     }
+  }
+  if (line_tokens[index_of_number].load == "runtime" &&
+      line_tokens[index_of_number + 1].load == "." &&
+      line_tokens[index_of_number + 2].load == "calculator") {
 
-    if (line_tokens[index_of_number].load == "runtime") {
-
-      // continue here make another rpn evaluator but outputting assembly
-    }
+    // continue here make another rpn evaluator but outputting assembly
   }
 
   return std::unexpected("couldn't figure it out");
