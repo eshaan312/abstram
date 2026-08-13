@@ -31,6 +31,9 @@ void eval_word(std::string &current_word, std::vector<token> &source_lex,
   source_lex.push_back({type, current_word});
 }
 
+std::unordered_set<std::string> two_character_symbols = {
+    "+=", "-=", "*=", "/=", "&&", "||", "==", "!=", "->", "<-"};
+
 void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
   for (int i = 0; i < source.size(); ++i) {
     std::string current_word = "";
@@ -83,12 +86,45 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
 
         } else if (j == source[i].size() - 1) {
           current_word += source[i][j];
-          eval_word(current_word, source_lex, current_mode);
+          std::string temp_word = "";
+
+          if (current_word.size() == 2 &&
+              two_character_symbols.contains(current_word)) {
+            eval_word(current_word, source_lex, current_mode);
+          } else if (two_character_symbols.size() == 3 &&
+                     two_character_symbols.contains(
+                         current_word.substr(0, 2))) {
+            std::string temp_word = current_word.substr(0, 2);
+            eval_word(temp_word, source_lex, current_mode);
+            temp_word = current_word[2];
+            eval_word(temp_word, source_lex, current_mode);
+          }
+
+          else {
+            for (char c : current_word) {
+              temp_word = c;
+              eval_word(temp_word, source_lex, current_mode);
+            }
+          }
           source_lex.push_back({lex_type::newline, ""});
           current_word = "";
 
         } else {
           current_word += source[i][j];
+          if (current_word.size() == 2 &&
+              two_character_symbols.contains(current_word)) {
+            eval_word(current_word, source_lex, current_mode);
+            current_word = "";
+          }
+
+          else if (current_word.size() == 2) {
+            std::string temp_word = "";
+            for (char c : current_word) {
+              temp_word = c;
+              eval_word(temp_word, source_lex, current_mode);
+            }
+            current_word = "";
+          }
         }
 
         break;
@@ -134,6 +170,9 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
 std::unordered_set<std::string> registers = {
     "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6",
     "xmm7", "eax",  "ebx",  "ecx",  "edx",  "edi",  "esi"};
+std::unordered_set<std::string> expression_registers = {
+    "xmm0_s", "xmm1_s", "xmm2_s", "xmm3_s", "xmm4_s", "xmm5_s", "xmm6_s",
+    "xmm7_s", "eax",    "ebx",    "ecx",    "edx",    "edi",    "esi"};
 
 // capitalizing those bc idk if itll get confused by the c++ type names
 
@@ -211,7 +250,7 @@ std::vector<token> to_rpn(const std::span<const token> infix) {
 std::expected<std::string, std::string>
 expected_number(const std::vector<token> &line_tokens, int index_of_number,
                 std::vector<std::string> &assembly,
-                std::vector<std::string> &cleanup) {
+                std::vector<std::string> &cleanup, std::string &type) {
   // this solves for someplace a number should be
   // it puts instructions into the assembly to solve for the number
   // or uses a calculator to get the number
@@ -379,6 +418,103 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                          &line_tokens[end_math]};
 
     std::vector<token> rpn = to_rpn(to_do_math_on);
+
+    std::stack<std::string> eval_stack;
+    for (const token t : rpn) {
+      if (t.type == lex_type::number) {
+        eval_stack.push(t.load);
+      } else if (t.type == lex_type::word) {
+        std::string first_four_or_3 = "";
+        if (t.load[0] == 'x')
+          first_four_or_3 = t.load.substr(0, 4);
+        else
+          first_four_or_3 = t.load;
+
+        if (!expression_registers.contains(t.load)) {
+          return t.load + " isn't a register allowed in expressions";
+        } else if (register_types[first_four_or_3] != type) {
+          return t.load + " doesn't match the type of the expression";
+        }
+      } else if (t.type == lex_type::symbol) {
+
+        if (t.load == "u+" || t.load == "u-") {
+          if (eval_stack.empty())
+            return std::unexpected("need more operands");
+          std::string val = eval_stack.top();
+          if (val[0] == 'x' && t.load == "u-") {
+            std::string first_four_or_3 = val.substr(0, 4);
+            // simd regs
+            int eax_is_taken = register_types.contains("eax");
+            if (eax_is_taken)
+              assembly.push_back("push eax");
+
+            // completely revamp the type system to be in runtime
+            //
+            // also you fucked up the symbols should not be multiple symbols
+            // because {-6 + 4} wont work
+            // dumbass
+            // ok fixed (badly but still)
+            assembly.push_back("vmovd eax, " + first_four_or_3);
+            assembly.push_back("xor eax, 0x80000000");
+            assembly.push_back("vmovd xmm0, eax");
+            if (eax_is_taken)
+              assembly.push_back("pop eax");
+
+            if (eax_is_taken)
+              cleanup.push_back("push eax");
+            cleanup.push_back("vmovd eax, " + first_four_or_3);
+            cleanup.push_back("xor eax, 0x80000000");
+            cleanup.push_back("vmovd xmm0, eax");
+            if (eax_is_taken)
+              cleanup.push_back("pop eax");
+          } else if (val[0] == 'e' && t.load == "u-") {
+            // gen regs
+            assembly.push_back("xor " + val + ", 0x80000000");
+          } else if (t.load == "u-") {
+            // number
+            eval_stack.pop();
+            if (type == "int") {
+              val = std::to_string(-std::stoi(val));
+            } else {
+              val = std::to_string(-std::stof(val));
+            }
+            eval_stack.push(val);
+          }
+
+        } else {
+          if (eval_stack.size() < 2)
+            return std::unexpected("need more operators");
+
+          std::string right = eval_stack.top();
+          eval_stack.pop();
+          std::string left = eval_stack.top();
+          eval_stack.pop();
+
+          if (t.load == "+") {
+            eval_stack.push(left + right);
+          } else if (t.load == "-")
+            eval_stack.push(left - right);
+          else if (t.load == "*")
+            eval_stack.push(left * right);
+          else if (t.load == "/") {
+            if (right == 0.0f)
+              return std::unexpected("can't divide by zero");
+            eval_stack.push(left / right);
+          } else if (t.load == "%") {
+            if (right == 0.0f)
+              return std::unexpected("can't modulus by zero");
+            eval_stack.push(std::fmod(left, right));
+          } else {
+            return std::unexpected("what is this: " + t.load);
+          }
+        }
+      }
+    }
+
+    if (eval_stack.size() != 1)
+      return std::unexpected("couldn't figure it out");
+
+    return std::to_string(eval_stack.top());
   }
 
   return std::unexpected("returned at the end: couldn't figure it out");
@@ -411,8 +547,19 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
 
         // expected number funcition
         std::vector<std::string> cleanup = {""};
+        std::string type;
+        // not providing a valid type because the expected number won't access
+        // it since this is compiler not runtime
+        // i shd probably add a check for that actually
+        if (source[line][t + 3].load == "runtime" ||
+            expression_registers.contains(source[line][t + 3].load)) {
+          return "on line " + std::to_string(line + 1) +
+                 "an alloc can't be decided at runtime, nothing dynamic is "
+                 "allowed. this is os dev so alloc as much as you want";
+        }
+
         auto expected_number_result =
-            expected_number(source[line], t + 3, assembly, cleanup);
+            expected_number(source[line], t + 3, assembly, cleanup, type);
         if (!expected_number_result.has_value())
           return expected_number_result.error() + " on line " +
                  std::to_string(line + 1);
@@ -432,8 +579,9 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
 }
 
 int main() {
+  // test negatives again
   std::vector<std::string> source = {
-      "field: alloc compiler.float_calculator {1 + 3 / 2}"};
+      "field: alloc compiler.float_calculator {-1 + 3 / 2}"};
   std::vector<token> source_lex_1d;
 
   lex(source, source_lex_1d);
