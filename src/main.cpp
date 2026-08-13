@@ -41,7 +41,7 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
       switch (current_mode) {
       case lex_type::word:
 
-        if (std::ispunct(source[i][j])) {
+        if (ispunct(source[i][j])) {
           eval_word(current_word, source_lex, current_mode);
           current_word = "";
           current_mode = lex_type::symbol;
@@ -101,7 +101,7 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
           current_mode = lex_type::word;
           --j;
 
-        } else if (std::ispunct(source[i][j])) {
+        } else if (ispunct(source[i][j])) {
           eval_word(current_word, source_lex, current_mode);
           current_word = "";
           current_mode = lex_type::symbol;
@@ -364,9 +364,24 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
       line_tokens[index_of_number + 2].load == "calculator") {
 
     // another rpn evaluator but outputting assembly
+    if (line_tokens[index_of_number + 3].load != "{")
+      return std::unexpected(
+          "failed to find curly brace after runtime.calculator");
+
+    int start_math = index_of_number + 4;
+    int end_math = index_of_number + 4;
+    while (line_tokens[end_math].load != "}") {
+      ++end_math;
+    }
+    // end_math is now equal to the index of the ending curly brace
+
+    std::span<const token> to_do_math_on{&line_tokens[start_math],
+                                         &line_tokens[end_math]};
+
+    std::vector<token> rpn = to_rpn(to_do_math_on);
   }
 
-  return std::unexpected("couldn't figure it out");
+  return std::unexpected("returned at the end: couldn't figure it out");
 }
 
 std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
@@ -417,7 +432,8 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
 }
 
 int main() {
-  std::vector<std::string> source = {"xmm0: flaot"};
+  std::vector<std::string> source = {
+      "field: alloc compiler.float_calculator {1 + 3 / 2}"};
   std::vector<token> source_lex_1d;
 
   lex(source, source_lex_1d);

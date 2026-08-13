@@ -3,6 +3,14 @@
 # every type is 32 bits
 # data in memory doesn't have types
 
+# EXAMPLE TODO actually make all this automatic
+# add killing and reviving registers
+# add extracting xmm registers to general registers to interact
+# add inserting too
+# add extracting xmm registers at indexes other than 0 to other xmm registers,
+# to multiply by floats
+# add extracting memory to xmm registers or general registers for interacting with anything
+
 # bootloader and multi-core and graphics setup and stack init
 # the stack is restricted to only being used by the compiler
 # but can be accessed via assembly insertions
