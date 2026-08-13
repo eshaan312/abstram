@@ -40,8 +40,12 @@ end
 # repeat loops
 repeat ecx 7
 
-        # this will pratt parse and then add 253 or something to the first number in xmm0
-        xmm0[0] += runtime.calculator{55 + 6 * ecx}
+        # xmm0_s is the first element of xmm0
+        # this won't compile because ecx and xmm0_s are different types
+        xmm0_s += runtime.calculator{55 + 6 * ecx}
+        
+        xmm0 -> xmm3: int
+
 
         # this will not be allowed because of the types, compiler error
         xmm0 += xmm1
