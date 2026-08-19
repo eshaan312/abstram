@@ -443,10 +443,12 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         else
           first_four_or_3 = t.load;
 
+        // WHAT IF THE TYPE OF THE EXPRESSION IS DYNAMIC
         if (!expression_registers.contains(t.load)) {
           return t.load + " isn't a register allowed in expressions";
         } else if ((register_types[first_four_or_3] != type) &&
-                   register_types[first_four_or_3] != "dynamic") {
+                   register_types[first_four_or_3] != "dynamic" &&
+                   type != "dynamic") {
           return t.load + " doesn't match the type of the expression";
         } else if (register_types[first_four_or_3] ==
                    "dynamic") { // only xmms can be dynamic
@@ -525,6 +527,7 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           } else if (val[0] == 'e' && t.load == "u-") {
             // gen regs
             assembly.push_back("xor " + val + ", 0x80000000");
+            cleanup.push_back("xor " + val + ", 0x80000000");
           } else if (t.load == "u-") {
             // number
             eval_stack.pop();
@@ -546,9 +549,13 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           eval_stack.pop();
 
           if (t.load == "+") {
-            if (register_types.contains("eax"))
-              assembly.push_back("push eax");
-            eval_stack.push(left + right);
+
+            // foolproof operation functions handle when the inputs are
+            // general register, xmm register, or a normal number
+            // it also handles cleaning up based. so like if the left
+            // is a register then it needs to do push the original value of the
+            foolproof_add(assembly, cleanup, left, right)
+
           } else if (t.load == "-")
             eval_stack.push(left - right);
           else if (t.load == "*")
