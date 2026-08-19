@@ -262,7 +262,7 @@ std::expected<std::string, std::string>
 expected_number(const std::vector<token> &line_tokens, int index_of_number,
                 std::vector<std::string> &assembly,
                 std::vector<std::string> &cleanup, std::string &type,
-                int line_number) {
+                int line_number, std::string &type_location) {
   // type has the string of the access of the number that has the type
   // this solves for someplace a number should be
   // it puts instructions into the assembly to solve for the number
