@@ -1,15 +1,3 @@
-# stuff to know about the abstram language:
-# it is case insensitive
-# every type is 32 bits
-# data in memory doesn't have types
-# every register is global
-# when you declare a register,
-# that's its type until you retype it
-# or cast it
-# the compiler keeps track of the
-# types of the registers in the runtime,
-# so be confident in your casting
-
 # EXAMPLE TODO 
 # add killing and reviving registers
 # add extracting xmm registers to general registers to interact
@@ -17,6 +5,37 @@
 # add extracting xmm registers at indexes other than 0 to other xmm registers,
 # to multiply by floats
 # add extracting memory to xmm registers or general registers for interacting with anything
+
+# stuff to know about the abstram language:
+# it is case insensitive
+# every type is 32 bits
+# data in memory doesn't have types
+# every register is global
+
+# it uses an interesting type system
+# every register is statically typed,
+# until it is cast to another type in a
+# conditional branch
+# after that it becomes dynamically typed
+# (for only the rest of the program after the branch merge)
+#
+# a potential problem here, if a dynamically typed reg is
+# moved to another reg, won't the other reg also become
+# dynamically typed
+#
+# nope! when a dynamic reg is moved to a static reg,
+# the compiler automatically inserts a check to see if 
+# they are already the same type. iff they arent the same
+# type, then it switches the the other reg to be dynamic
+#
+# in loops, if a reg is cast to another type inside a loop
+# it will make two versions of the loop, one with static
+# typing, the other with dynamic typing. the first one will be
+# used first, the second one will be used the rest of the time
+#
+# if you cast a reg and then uncast it in the same loop with
+# each instruction having the same condition, it stays static
+
 
 # bootloader and multi-core and graphics setup and stack init
 # the stack is restricted to only being used by the compiler

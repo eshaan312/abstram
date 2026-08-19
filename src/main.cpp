@@ -10,6 +10,8 @@
 
 enum class lex_type { symbol, word, number, newline };
 
+int label_counter = 0;
+
 struct token {
   lex_type type;
   std::string load;
@@ -176,7 +178,16 @@ std::unordered_set<std::string> expression_registers = {
 
 // capitalizing those bc idk if itll get confused by the c++ type names
 
-std::unordered_map<std::string, std::string> register_types = {};
+std::unordered_map<std::string, std::string> register_types = {
+    {"xmm0", "[register_types]"},      {"xmm1", "[register_types + 4]"},
+    {"xmm2", "[register_types + 8]"},  {"xmm3", "[register_types + 12]"},
+    {"xmm4", "[register_types + 16]"}, {"xmm5", "[register_types + 20]"},
+    {"xmm6", "[register_types + 24]"}, {"xmm7", "[register_types + 28]"},
+    {"eax", "[register_types + 32]"},  {"ebx", "[register_types + 36]"},
+    {"ecx", "[register_types + 40]"},  {"edx", "[register_types + 44]"},
+    {"edi", "[register_types + 48]"},  {"esi", "[register_types + 52]"},
+
+};
 
 // standard shunting yard
 
@@ -250,7 +261,9 @@ std::vector<token> to_rpn(const std::span<const token> infix) {
 std::expected<std::string, std::string>
 expected_number(const std::vector<token> &line_tokens, int index_of_number,
                 std::vector<std::string> &assembly,
-                std::vector<std::string> &cleanup, std::string &type) {
+                std::vector<std::string> &cleanup, std::string &type,
+                int line_number) {
+  // type has the string of the access of the number that has the type
   // this solves for someplace a number should be
   // it puts instructions into the assembly to solve for the number
   // or uses a calculator to get the number
@@ -432,9 +445,46 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
         if (!expression_registers.contains(t.load)) {
           return t.load + " isn't a register allowed in expressions";
-        } else if (register_types[first_four_or_3] != type) {
+        } else if ((register_types[first_four_or_3] != type) &&
+                   register_types[first_four_or_3] != "dynamic") {
           return t.load + " doesn't match the type of the expression";
+        } else if (register_types[first_four_or_3] ==
+                   "dynamic") { // only xmms can be dynamic
+          if (type == "int") {
+            // dynamic_type_index *= 4; not this bc its defined in bytes
+
+            assembly.push_back("push eax");
+            assembly.push_back("mov al, [register_types + ");
+            assembly[assembly.size() - 1] += first_four_or_3[3];
+            assembly[assembly.size() - 1] += ']';
+
+            assembly.push_back(
+                "cmp al, 1"); // 1 means int 2 means float 0 means uninit
+            assembly.push_back("je true_type_" + std::to_string(label_counter));
+            assembly.push_back("mov bl, 'T'");
+            assembly.push_back("jne crash");
+            assembly.push_back("true_type_" + std::to_string(label_counter) +
+                               ":");
+            ++label_counter;
+            assembly.push_back("pop eax");
+          } else if (type == "float") {
+            assembly.push_back("push eax");
+            assembly.push_back("mov al, [register_types + ");
+            assembly[assembly.size() - 1] += first_four_or_3[3];
+            assembly[assembly.size() - 1] += ']';
+
+            assembly.push_back(
+                "cmp al, 2"); // 1 means int 2 means float 0 means uninit
+            assembly.push_back("je true_type_" + std::to_string(label_counter));
+            assembly.push_back("mov bl, 'T'");
+            assembly.push_back("jne crash");
+            assembly.push_back("true_type_" + std::to_string(label_counter) +
+                               ":");
+            ++label_counter;
+            assembly.push_back("pop eax");
+          }
         }
+
       } else if (t.type == lex_type::symbol) {
 
         if (t.load == "u+" || t.load == "u-") {
@@ -448,7 +498,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             if (eax_is_taken)
               assembly.push_back("push eax");
 
-            // completely revamp the type system to be in runtime
+            // completely revamp the type system to be in runtime partially
+            // actually
             //
             // also you fucked up the symbols should not be multiple symbols
             // because {-6 + 4} wont work
@@ -558,14 +609,16 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
                  "allowed. this is os dev so alloc as much as you want";
         }
 
-        auto expected_number_result =
-            expected_number(source[line], t + 3, assembly, cleanup, type);
+        auto expected_number_result = expected_number(
+            source[line], t + 3, assembly, cleanup, type, line + 1);
         if (!expected_number_result.has_value())
           return expected_number_result.error() + " on line " +
                  std::to_string(line + 1);
 
+        assembly.push_back("section .bss");
         assembly.push_back(source[line][t].load + ": resb " +
                            *expected_number_result);
+        assembly.push_back("section .text");
 
         for (std::string l : cleanup) {
           assembly.push_back(l);
@@ -580,6 +633,10 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
 
 int main() {
   // test negatives again
+  // std::unordered_set<std::string> registers = {
+  // "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6",
+  // "xmm7", "eax",  "ebx",  "ecx",  "edx",  "edi",  "esi"};
+
   std::vector<std::string> source = {
       "field: alloc compiler.float_calculator {-1 + 3 / 2}"};
   std::vector<token> source_lex_1d;
@@ -598,6 +655,25 @@ int main() {
   }
 
   std::vector<std::string> assembly;
+  // type for each register, 0 is not typed, 1 is int, 2 is float
+  assembly.push_back("section .data");
+  assembly.push_back("register_types: db 0, 0, 0, 0, 0, 0, 0, 0");
+  assembly.push_back("section .text");
+  assembly.push_back("jmp skip_crash");
+  assembly.push_back("crash: ");
+  assembly.push_back("mov al, 'E'");
+  assembly.push_back("out 0xe9, al");
+  assembly.push_back("mov al, 'R'");
+  assembly.push_back("out 0xe9, al");
+  assembly.push_back("mov al, 'R'");
+  assembly.push_back("out 0xe9, al");
+  assembly.push_back("mov al, '-'");
+  assembly.push_back("out 0xe9, al");
+  assembly.push_back("out 0xe9, bl"); // load bl with error code
+  assembly.push_back("cli");
+  assembly.push_back("hlt");
+  assembly.push_back("jmp $");
+  assembly.push_back("skip_crash: ");
 
   auto err = evaluate(source_lex, assembly);
 
