@@ -40,6 +40,8 @@
 # bootloader and multi-core and graphics setup and stack init
 # the stack is restricted to only being used by the compiler
 # but can be accessed via assembly insertions
+#
+
 run runtime.init
 
 # init general memory field

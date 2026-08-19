@@ -453,7 +453,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           if (type == "int") {
             // dynamic_type_index *= 4; not this bc its defined in bytes
 
-            assembly.push_back("push eax");
+            bool eax_is_taken = register_types.contains("eax");
+            if (eax_is_taken)
+              assembly.push_back("push eax");
             assembly.push_back("mov al, [register_types + ");
             assembly[assembly.size() - 1] += first_four_or_3[3];
             assembly[assembly.size() - 1] += ']';
@@ -481,7 +483,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             assembly.push_back("true_type_" + std::to_string(label_counter) +
                                ":");
             ++label_counter;
-            assembly.push_back("pop eax");
+            bool eax_is_taken = register_types.contains("eax");
+            if (eax_is_taken)
+              assembly.push_back("pop eax");
           }
         }
 
@@ -494,7 +498,7 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           if (val[0] == 'x' && t.load == "u-") {
             std::string first_four_or_3 = val.substr(0, 4);
             // simd regs
-            int eax_is_taken = register_types.contains("eax");
+            bool eax_is_taken = register_types.contains("eax");
             if (eax_is_taken)
               assembly.push_back("push eax");
 
@@ -542,6 +546,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           eval_stack.pop();
 
           if (t.load == "+") {
+            if (register_types.contains("eax"))
+              assembly.push_back("push eax");
             eval_stack.push(left + right);
           } else if (t.load == "-")
             eval_stack.push(left - right);
