@@ -178,16 +178,7 @@ std::unordered_set<std::string> expression_registers = {
 
 // capitalizing those bc idk if itll get confused by the c++ type names
 
-std::unordered_map<std::string, std::string> register_types = {
-    {"xmm0", "[register_types]"},      {"xmm1", "[register_types + 4]"},
-    {"xmm2", "[register_types + 8]"},  {"xmm3", "[register_types + 12]"},
-    {"xmm4", "[register_types + 16]"}, {"xmm5", "[register_types + 20]"},
-    {"xmm6", "[register_types + 24]"}, {"xmm7", "[register_types + 28]"},
-    {"eax", "[register_types + 32]"},  {"ebx", "[register_types + 36]"},
-    {"ecx", "[register_types + 40]"},  {"edx", "[register_types + 44]"},
-    {"edi", "[register_types + 48]"},  {"esi", "[register_types + 52]"},
-
-};
+std::unordered_map<std::string, std::string> register_types = {};
 
 // standard shunting yard
 
@@ -262,7 +253,7 @@ std::expected<std::string, std::string>
 expected_number(const std::vector<token> &line_tokens, int index_of_number,
                 std::vector<std::string> &assembly,
                 std::vector<std::string> &cleanup, std::string &type,
-                int line_number, std::string &type_location) {
+                int line_number, std::string type_location) {
   // type has the string of the access of the number that has the type
   // this solves for someplace a number should be
   // it puts instructions into the assembly to solve for the number
@@ -450,6 +441,10 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                    register_types[first_four_or_3] != "dynamic" &&
                    type != "dynamic") {
           return t.load + " doesn't match the type of the expression";
+        } else if (type == "dynamic" &&
+                   register_types[first_four_or_3] != "dynamic") {
+        } else if (type == "dynamic" &&
+                   register_types[first_four_or_3] == "dynamic") {
         } else if (register_types[first_four_or_3] ==
                    "dynamic") { // only xmms can be dynamic
           if (type == "int") {
@@ -554,7 +549,7 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // general register, xmm register, or a normal number
             // it also handles cleaning up based. so like if the left
             // is a register then it needs to do push the original value of the
-            foolproof_add(assembly, cleanup, left, right)
+            foolproof_add(assembly, cleanup, left, right);
 
           } else if (t.load == "-")
             eval_stack.push(left - right);
@@ -623,7 +618,7 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
         }
 
         auto expected_number_result = expected_number(
-            source[line], t + 3, assembly, cleanup, type, line + 1);
+            source[line], t + 3, assembly, cleanup, type, line + 1, "");
         if (!expected_number_result.has_value())
           return expected_number_result.error() + " on line " +
                  std::to_string(line + 1);
