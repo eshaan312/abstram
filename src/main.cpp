@@ -290,7 +290,11 @@ std::optional<std::string> find_next_avaliable_simd_register() {
 
   return std::nullopt;
 }
-
+void int_float_assembly_push_back(std::vector<std::string> &i,
+                                  std::vector<std::string> &f, std::string s) {
+  i.push_back(s);
+  f.push_back(s);
+}
 std::expected<std::string, std::string>
 
 // type_location input if provided should look like "[register_types + X]" or
@@ -720,6 +724,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         // then you would do
         // ebx = eax
         // ebx += 7
+        // push ebx
+        // pop ebx
         // ebx += eax
         // push ebx
         // ebx = eax
@@ -727,6 +733,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         // ebx *= [esp]
         // ebx += 56
         // xmm0_s = ebx
+        //
+        // ACTUALLY i decided to use an xmm register instead of ebx so that it
+        // can be used for both int and float operations
         //
         // eventually we can do the optimization to use every avaliable register
         // before spilling to the stack, but for now just using one register is
@@ -746,23 +755,35 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // because {-6 + 4} wont work
             // dumbass
             // ok fixed (badly but still)
-            assembly.push_back("vmovd eax, " + first_four_or_3);
-            assembly.push_back("xor eax, 0x80000000");
 
-            // what the fuck why are we moving to xmm0???
-            // also wheres the eval_stack push
-            assembly.push_back("vmovd xmm0, eax");
-            if (eax_is_taken)
-              assembly.push_back("pop eax");
+            int_float_assembly_push_back(int_assembly, float_assembly,
+                                         "vmovups " + temporary_simd +
+                                             first_four_or_3);
+            int_float_assembly_push_back(int_assembly, float_assembly,
+                                         "vxorps " + temporary_simd +
+                                             ", [negation_mask]");
+            auto register_to_use_for_things =
+                find_next_avaliable_general_register(true);
+
+            std::string genreg_for_things = "";
+            if (!register_to_use_for_things) {
+              assembly.push_back("push eax");
+              genreg_for_things = "eax";
+            } else {
+              genreg_for_things = *register_to_use_for_things;
+            }
+
+            assembly.push_back("vmovd " + genreg_for_things + ", " +
+                               temporary_simd);
+            assembly.push_back("push " + genreg_for_things);
+            if (!register_to_use_for_things) {
+              assembly.push_back("mov eax, [esp + 4]");
+            }
 
             // ok so lets do it so instead of fucking reversing the change
             // we just store the value and bring it back
             // not a big priority here tho since its not that bad
             // but in other ops do that REMEMBER ESHAAN
-            if (eax_is_taken)
-              cleanup.push_back("push eax");
-            cleanup.push_back("vmovd eax, " + first_four_or_3);
-            cleanup.push_back("xor eax, 0x80000000");
 
             // replace xmm0 with whatever is supposed to be here too
             // wait um if we're changing the actual value in the xmm0 register
@@ -782,21 +803,40 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // ok so i need a temporary register to handle things in parenthesis
             // then for the temporary register if theres anything in parenthesis
             // i push it to the stack
-            cleanup.push_back("vmovd xmm0, eax");
-            if (eax_is_taken)
-              cleanup.push_back("pop eax");
+            eval_stack.push("[esp]");
           } else if (val[0] == 'e' && t.load == "u-") {
-            // gen regs
-            assembly.push_back("xor " + val + ", 0x80000000");
-            cleanup.push_back("xor " + val + ", 0x80000000");
+            int_float_assembly_push_back(int_assembly, float_assembly,
+                                         "vmovd " + val + ", " +
+                                             temporary_simd);
+            int_float_assembly_push_back(int_assembly, float_assembly,
+                                         "vxorps " + temporary_simd +
+                                             ", [negation_mask]");
+            auto register_to_use_for_things =
+                find_next_avaliable_general_register(true);
+
+            std::string genreg_for_things = "";
+            if (!register_to_use_for_things) {
+              assembly.push_back("push eax");
+              genreg_for_things = "eax";
+            } else {
+              genreg_for_things = *register_to_use_for_things;
+            }
+
+            assembly.push_back("vmovd " + genreg_for_things + ", " +
+                               temporary_simd);
+            assembly.push_back("push " + genreg_for_things);
+            if (!register_to_use_for_things) {
+              assembly.push_back("mov eax, [esp + 4]");
+            }
+
+            eval_stack.push("[esp]");
           } else if (t.load == "u-") {
             // number
             eval_stack.pop();
-            if (type == "int") {
-              val = std::to_string(-std::stoi(val));
-            } else {
-              val = std::to_string(-std::stof(val));
-            }
+            if (val[0] == '-') {
+              val = val.substr(1, val.size() - 1);
+            } else
+              val = '-' + val;
             eval_stack.push(val);
           }
 
@@ -938,6 +978,7 @@ int main() {
   assembly.push_back(
       "register_types: db 0, 0, 0, 0, 0, 0, 0, 0"); // one type space for each
                                                     // xmm
+  assembly.push_back("negation_mask: 0x80000000");
   assembly.push_back("section .text");
   assembly.push_back("jmp skip_crash");
   assembly.push_back("crash: ");
