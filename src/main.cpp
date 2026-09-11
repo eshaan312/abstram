@@ -494,6 +494,21 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         genreg_for_things = *register_to_use_for_things;
       }
 
+      // ok so we need to get a second simd register for this bc every
+      // simd operation requires another simd register not just one which is
+      // annoying
+      //
+      // also consider what will happen if the temporary_simd is actually
+      // used? do i just take xmm0 off the market?? or what if we spill
+      // the temporary_simd register to stack like we're already doing,
+      // and we just replace all its uses with its stack point?
+      //
+      // so because we don't make any non self contained pushes after these next
+      // few lines, xmm0 is gonna be [esp]
+      //
+      // ok so now that we've solved that problem, lets figure out getting
+      // a second xmm register
+
       assembly.push_back("vmovd " + genreg_for_things + ", xmm0");
       assembly.push_back("push " + genreg_for_things);
       temporary_simd = "xmm0";
@@ -721,8 +736,10 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         // one that the layered operations happen in
         //
         // so for example if you have an exp like
-        // xmm0_s = 56 + eax * (eax + 7) * (-eax + 9) * (ecx / 5)
-        // rpn: 56 eax eax 7 + * eax u- 9 + * ecx 5 / * +
+        // xmm0_s = 56 + eax * (eax + 7) * (-eax + 9) * (ebx / 5)
+        // rpn: 56 eax eax 7 + * eax u- 9 + * ebx 5 / * +
+        //
+        // mov [esp], ebx
         //
         // <- eax, 7
         // ebx = eax
@@ -753,8 +770,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         // mov [esp - 4], ebx
         // -> [esp - 4]
         //
-        // <- ecx, 5
-        // ebx = ecx
+        // <- ebx, 5
+        // ebx = [esp] # on purpose because ebx is esp
         // ebx /= 5
         // mov [esp - 8], ebx
         // -> [esp - 8]
@@ -794,8 +811,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // ok fixed (badly but still)
 
             int_float_assembly_push_back(int_assembly, float_assembly,
-                                         "vmovups " + temporary_simd +
-                                             first_four_or_3);
+                                         "vpinsrd " + temporary_simd + ", " +
+                                             temporary_simd + ", " +
+                                             first_four_or_3 + ", 0");
             int_float_assembly_push_back(int_assembly, float_assembly,
                                          "vxorps " + temporary_simd +
                                              ", [negation_mask]");
@@ -853,8 +871,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             current_esp_displacement += 4;
           } else if (val[0] == 'e' && t.load == "u-") {
             int_float_assembly_push_back(int_assembly, float_assembly,
-                                         "vmovd " + val + ", " +
-                                             temporary_simd);
+                                         "vpinsrd " + temporary_simd + ", " +
+                                             temporary_simd + ", " + val +
+                                             ", 0");
             int_float_assembly_push_back(int_assembly, float_assembly,
                                          "vxorps " + temporary_simd +
                                              ", [negation_mask]");
@@ -924,6 +943,63 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               // what we do here is super important
               // ok so we've gotta move it out of the
               // stack and into the temporary register
+              //
+              // this also has to be the thing we push to the eval_stack
+              eval_stack.push(left);
+              int_float_assembly_push_back(
+                  int_assembly, float_assembly,
+                  "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                      left + ", 0"); // moves left into the first slot of
+                                     // temporary_simd
+              auto temporary_register_opt_2 =
+                  find_next_avaliable_simd_register();
+
+              std::string temporary_simd_2 = "";
+              if (!temporary_register_opt_2) {
+
+                auto register_to_use_for_things =
+                    find_next_avaliable_general_register(true);
+
+                std::string genreg_for_things = "";
+                if (!register_to_use_for_things) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "push eax");
+                  genreg_for_things = "eax";
+                } else {
+                  genreg_for_things = *register_to_use_for_things;
+                }
+
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             "vmovd " + genreg_for_things +
+                                                 ", xmm1");
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             "push " + genreg_for_things);
+                temporary_simd_2 = "xmm1";
+                if (!register_to_use_for_things) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "mov eax, [esp + 4]");
+                }
+              } else {
+                temporary_simd_2 = *temporary_register_opt_2;
+              }
+
+              // OKAY BE VERY CAREFUL
+              // IN THIS CURRENT SITATION
+              // iff !temporary_register_opt
+              // THEN
+              // temporary_simd = [esp + 8]
+              // and iff !temporary_register_opt_2
+              // THEN
+              // temporary_simd = [esp]
+
+              if (!temporary_register_opt)
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             "vpinsrd xmm1, xmm1, [esp], 0");
+              int_float_assembly_push_back(
+                  int_assembly, float_assembly,
+                  "add esp, 8"); // to revert the stack to normal otherwise the
+                                 // original temporary simd register will not be
+                                 // tracked properly
             }
 
           } else if (t.load == "-")
@@ -949,6 +1025,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
       return std::unexpected("couldn't figure it out");
 
     return std::to_string(eval_stack.top());
+    if (!temporary_register_opt)
+      assembly.push_back("vpinsrd xmm0, xmm0, [esp], 0");
   }
 
   return std::unexpected("returned at the end: couldn't figure it out");
