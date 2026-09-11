@@ -169,14 +169,14 @@ void lex(std::vector<std::string> &source, std::vector<token> &source_lex) {
 }
 
 std::unordered_map<std::string, std::string> lower_register_half = {
-    {"eax" : "ax"}, {"ebx" : "bx"}, {"ecx" : "cx"},
-    {"edx" : "dx"}, {"edi" : "di"}, {"esi" : "si"},
+    {"eax", "ax"}, {"ebx", "bx"}, {"ecx", "cx"},
+    {"edx", "dx"}, {"edi", "di"}, {"esi", "si"},
 };
 
 std::unordered_map<std::string, std::string> lower_lower_register_half = {
-    {"eax" : "al"}, {"ebx" : "bl"}, {"ecx" : "cl"}, {"edx" : "dl"}};
+    {"eax", "al"}, {"ebx", "bl"}, {"ecx", "cl"}, {"edx", "dl"}};
 std::unordered_map<std::string, std::string> lower_upper_register_half = {
-    {"eax" : "ax"}, {"ebx" : "bx"}, {"ecx" : "cx"}, {"edx" : "dx"}};
+    {"eax", "ax"}, {"ebx", "bx"}, {"ecx", "cx"}, {"edx", "dx"}};
 
 // all the registers i plan to use currently. might add YMMs later too
 std::unordered_set<std::string> registers = {
@@ -272,9 +272,9 @@ bool check_if_register_is_taken(std::string &register_to_check) {
 std::optional<std::string>
 find_next_avaliable_general_register(bool requires_8_bit_reg) {
   size_t sz = requires_8_bit_reg ? registers.size() - 2 : registers.size();
-  for (int i = 8; i < sz; ++i) {
-    if (!check_if_register_is_taken(registers[i])) {
-      return registers[i];
+  for (auto r : registers) {
+    if (!check_if_register_is_taken(r)) {
+      return r;
     }
   }
 
@@ -471,14 +471,14 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           first_four_or_3 = t.load;
 
         // WHAT IF THE TYPE OF THE EXPRESSION IS DYNAMIC
-        if (!expression_registers.contains(t.load)) {
+        if (!expression_registers.contains(t.load)) { // handled
           return t.load + " isn't a register allowed in expressions";
         } else if ((register_types[first_four_or_3] != type) &&
                    register_types[first_four_or_3] != "dynamic" &&
-                   type != "dynamic") {
+                   type != "dynamic") { // handled
           return t.load + " doesn't match the type of the expression";
         } else if (type == "dynamic" &&
-                   register_types[first_four_or_3] != "dynamic") {
+                   register_types[first_four_or_3] != "dynamic") { // handled
           // test if the type is the static type of the input register
           if (register_types[first_four_or_3] == "int") {
             // dynamic_type_index *= 4; not this bc its defined in bytes
@@ -494,7 +494,6 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               genreg_for_things = *register_to_use_for_things;
             }
 
-            assembly.push_back("push " + genreg_for_things);
             assembly.push_back(
                 "mov " + lower_lower_register_half[genreg_for_things] + ", ");
             assembly[assembly.size() - 1] += type_location;
@@ -521,7 +520,6 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             } else {
               genreg_for_things = *register_to_use_for_things;
             }
-            assembly.push_back("push " + genreg_for_things);
             assembly.push_back(
                 "mov " + lower_lower_register_half[genreg_for_things] + ", ");
             assembly[assembly.size() - 1] += type_location;
@@ -538,11 +536,89 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             if (!register_to_use_for_things)
               assembly.push_back("pop eax");
           }
-        } else if (type == "dynamic" &&
-                   register_types[first_four_or_3] == "dynamic") {
+        } else if (type == "dynamic" && register_types[first_four_or_3] ==
+                                            "dynamic") { // UNHANDLED TODO
           // test if the types are the same
 
-          if (register_types[first_four_or_3] == "int") {
+          auto register_to_use_for_things =
+              find_next_avaliable_general_register(true);
+
+          std::string genreg_for_things = "";
+          if (!register_to_use_for_things) {
+            assembly.push_back("push eax");
+            genreg_for_things = "eax";
+          } else {
+            genreg_for_things = *register_to_use_for_things;
+            register_types[genreg_for_things] =
+                ""; // so that genreg_for_things2 wont be the same
+          }
+          auto register_to_use_for_things2 =
+              find_next_avaliable_general_register(true);
+
+          std::string genreg_for_things2 = "";
+          if (!register_to_use_for_things2) {
+            assembly.push_back("push ebx");
+            genreg_for_things2 = "ebx";
+          } else {
+            genreg_for_things2 = *register_to_use_for_things2;
+          }
+          if (register_to_use_for_things) {
+            register_types.erase(genreg_for_things); // bc this is just a temp
+          }
+
+          assembly.push_back(
+              "mov " + lower_lower_register_half[genreg_for_things] + ", ");
+          assembly[assembly.size() - 1] += type_location;
+
+          assembly.push_back("mov " +
+                             lower_lower_register_half[genreg_for_things2] +
+                             ", [register_types + ");
+          assembly[assembly.size() - 1] += first_four_or_3[3];
+          assembly[assembly.size() - 1] += ']';
+
+          assembly.push_back("cmp " +
+                             lower_lower_register_half[genreg_for_things] +
+                             ", 1"); // 1 means int 2 means float 0 means uninit
+          assembly.push_back("je true_type_" + std::to_string(label_counter));
+          assembly.push_back("mov bl, 'T'");
+          assembly.push_back("jne crash");
+          assembly.push_back("true_type_" + std::to_string(label_counter) +
+                             ":");
+          ++label_counter;
+          if (!register_to_use_for_things)
+            assembly.push_back("pop eax");
+        } else if (register_types[first_four_or_3] == "float") {
+          auto register_to_use_for_things =
+              find_next_avaliable_general_register(true);
+
+          std::string genreg_for_things = "";
+          if (!register_to_use_for_things) {
+            assembly.push_back("push eax");
+            genreg_for_things = "eax";
+          } else {
+            genreg_for_things = *register_to_use_for_things;
+          }
+
+          assembly.push_back(
+              "mov " + lower_lower_register_half[genreg_for_things] + ", ");
+          assembly[assembly.size() - 1] += type_location;
+
+          assembly.push_back(
+              "cmp al, 2"); // 1 means int 2 means float 0 means uninit
+          assembly.push_back("je true_type_" + std::to_string(label_counter));
+          assembly.push_back("mov bl, 'T'");
+          assembly.push_back("jne crash");
+          assembly.push_back("true_type_" + std::to_string(label_counter) +
+                             ":");
+          ++label_counter;
+          if (!register_to_use_for_things)
+            assembly.push_back("pop eax");
+        } else if (register_types[first_four_or_3] == "dynamic") { // handled
+          // test if the input register is the same as the static type of the
+          // expression
+
+          // only xmms can be dynamic
+          if (type == "int") {
             // dynamic_type_index *= 4; not this bc its defined in bytes
 
             auto register_to_use_for_things =
@@ -556,70 +632,43 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               genreg_for_things = *register_to_use_for_things;
             }
 
-            assembly.push_back("push " + genreg_for_things);
-            assembly.push_back("mov al, ");
-            assembly[assembly.size() - 1] += type_location;
+            assembly.push_back("mov " +
+                               lower_lower_register_half[genreg_for_things] +
+                               ", [register_types + ");
+            assembly[assembly.size() - 1] += first_four_or_3[3];
+            assembly[assembly.size() - 1] += ']';
 
             assembly.push_back(
-                "cmp al, 1"); // 1 means int 2 means float 0 means uninit
+                "cmp " + lower_lower_register_half[genreg_for_things] +
+                ", 1"); // 1 means int 2 means float 0 means uninit
             assembly.push_back("je true_type_" + std::to_string(label_counter));
             assembly.push_back("mov bl, 'T'");
             assembly.push_back("jne crash");
             assembly.push_back("true_type_" + std::to_string(label_counter) +
                                ":");
             ++label_counter;
-            assembly.push_back("pop eax");
-          } else if (register_types[first_four_or_3] == "float") {
-            assembly.push_back("push eax");
-            assembly.push_back("mov al, ");
-            assembly[assembly.size() - 1] += type_location;
-
-            assembly.push_back(
-                "cmp al, 2"); // 1 means int 2 means float 0 means uninit
-            assembly.push_back("je true_type_" + std::to_string(label_counter));
-            assembly.push_back("mov bl, 'T'");
-            assembly.push_back("jne crash");
-            assembly.push_back("true_type_" + std::to_string(label_counter) +
-                               ":");
-            ++label_counter;
-            bool eax_is_taken = register_types.contains("eax");
-            if (eax_is_taken)
+            if (!register_to_use_for_things)
               assembly.push_back("pop eax");
-          }
-        } else if (register_types[first_four_or_3] == "dynamic") {
-          // test if the input register is the same as the static type of the
-          // expression
-
-          // only xmms can be dynamic
-          if (type == "int") {
-            // dynamic_type_index *= 4; not this bc its defined in bytes
-
-            bool eax_is_taken = register_types.contains(
-                "eax"); // should probably make something that tests for all
-                        // types instead of just eax
-            if (eax_is_taken)
-              assembly.push_back("push eax");
-            assembly.push_back("mov al, [register_types + ");
-            assembly[assembly.size() - 1] += first_four_or_3[3];
-            assembly[assembly.size() - 1] += ']';
-
-            assembly.push_back(
-                "cmp al, 1"); // 1 means int 2 means float 0 means uninit
-            assembly.push_back("je true_type_" + std::to_string(label_counter));
-            assembly.push_back("mov bl, 'T'");
-            assembly.push_back("jne crash");
-            assembly.push_back("true_type_" + std::to_string(label_counter) +
-                               ":");
-            ++label_counter;
-            assembly.push_back("pop eax");
           } else if (type == "float") {
-            assembly.push_back("push eax");
-            assembly.push_back("mov al, [register_types + ");
+            auto register_to_use_for_things =
+                find_next_avaliable_general_register(true);
+
+            std::string genreg_for_things = "";
+            if (!register_to_use_for_things) {
+              assembly.push_back("push eax");
+              genreg_for_things = "eax";
+            } else {
+              genreg_for_things = *register_to_use_for_things;
+            }
+            assembly.push_back("mov " +
+                               lower_lower_register_half[genreg_for_things] +
+                               ", [register_types + ");
             assembly[assembly.size() - 1] += first_four_or_3[3];
             assembly[assembly.size() - 1] += ']';
 
             assembly.push_back(
-                "cmp al, 2"); // 1 means int 2 means float 0 means uninit
+                "cmp " + lower_lower_register_half[genreg_for_things] +
+                ", 2"); // 1 means int 2 means float 0 means uninit
             assembly.push_back("je true_type_" + std::to_string(label_counter));
             assembly.push_back("mov bl, 'T'");
             assembly.push_back("jne crash");
@@ -627,11 +676,10 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                ":");
             ++label_counter;
             bool eax_is_taken = register_types.contains("eax");
-            if (eax_is_taken)
+            if (!register_to_use_for_things)
               assembly.push_back("pop eax");
           }
         }
-
       } else if (t.type == lex_type::symbol) {
 
         if (t.load == "u+" || t.load == "u-") {
@@ -677,6 +725,17 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // and another search to see what registers are already in use for
             // this expression wow thisll be so fun
             // also i think we need to start using stack more freely atp
+            //
+            //
+            // ok so new goal: apply each expression to the actual input
+            // register in order why rhe fuck did that take me so long to think
+            // of am i dumb
+            //
+            //
+            // wait no im even more dumb thats now how math works
+            // ok so i need a temporary register to handle things in parenthesis
+            // then for the temporary register if theres anything in parenthesis
+            // i push it to the stack
             cleanup.push_back("vmovd xmm0, eax");
             if (eax_is_taken)
               cleanup.push_back("pop eax");
@@ -710,6 +769,10 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // general register, xmm register, or a normal number
             // it also handles cleaning up based. so like if the left
             // is a register then it needs to do push the original value of the
+            //
+            //
+            //
+            // actually no im not making this
             foolproof_add(assembly, cleanup, left, right);
 
           } else if (t.load == "-")
