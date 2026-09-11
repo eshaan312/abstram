@@ -921,9 +921,21 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             return std::unexpected("need more operators");
 
           std::string right = eval_stack.top();
+          if (right[0] == 'x')
+            right = right.substr(0, 4);
           eval_stack.pop();
           std::string left = eval_stack.top();
+          if (left[0] == 'x')
+            left = left.substr(0, 4);
           eval_stack.pop();
+
+          if (left == "xmm0" && !temporary_register_opt) {
+            left = "[esp]";
+          }
+
+          if (right == "xmm0" && !temporary_register_opt) {
+            right = "[esp]";
+          }
 
           if (t.load == "+") {
 
@@ -938,7 +950,7 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
             //  left and right can be either [esp - X], a register, or a number
 
-            if (left.substr(0, 4) == "[esp") {
+            if (left.substr(0, 5) == "[esp ") {
               // so we've gotten a number from stack
               // what we do here is super important
               // ok so we've gotta move it out of the
@@ -987,10 +999,44 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               // IN THIS CURRENT SITATION
               // iff !temporary_register_opt
               // THEN
-              // temporary_simd = [esp + 8]
+              // temporary_simd was xmm0 now = [esp + 8]
               // and iff !temporary_register_opt_2
               // THEN
-              // temporary_simd = [esp]
+              // temporary_simd_2 was xmm1 now = [esp]
+              //
+              // check if right is either xmm0 or xmm1 and if right has
+
+              if (left == "[esp]")
+                left = "[esp + 8]";
+
+              else if (left == "xmm1" && !temporary_register_opt_2) {
+                left = "[esp]";
+              }
+
+              if (right == "[esp]")
+                right = "[esp + 8]";
+
+              else if (right == "xmm1" && !temporary_register_opt_2) {
+                right = "[esp]";
+              }
+
+              // for int
+              // vpinsrd temporary_simd_2, temporary_simd_2, right
+              // vpaddd temporary_simd, temporary_simd, temporary_simd_2
+              //
+              // for float
+              // vpinsrd temporary_simd_2, temporary_simd_2, right
+              // vaddss temporary_simd, temporary_simd, temporary_simd_2
+
+              int_float_assembly_push_back(int_assembly, float_assembly,
+                                           "vpinsrd " + temporary_simd_2 +
+                                               ", " + temporary_simd_2 + ", " +
+                                               right);
+              int_assembly.push_back("vpaddd " + temporary_simd + ", " +
+                                     temporary_simd + ", " + temporary_simd_2);
+              float_assembly.push_back("vaddss " + temporary_simd + ", " +
+                                       temporary_simd + ", " +
+                                       temporary_simd_2);
 
               if (!temporary_register_opt)
                 int_float_assembly_push_back(int_assembly, float_assembly,
