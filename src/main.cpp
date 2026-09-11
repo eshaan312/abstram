@@ -719,20 +719,35 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         // one that the layered operations happen in
         //
         // so for example if you have an exp like
-        // xmm0_s = 56 + eax * (eax + 7) * (eax + 9)
-        // then the rpn would be 56 eax eax 7 + * eax 9 + * +
-        // then you would do
+        // xmm0_s = 56 + eax * (eax + 7) * (eax + 9) * (ecx / 5)
+        // rpn: 56 eax eax 7 + * eax 9 + * ecx 5 / * +
         // ebx = eax
         // ebx += 7
-        // push ebx
-        // pop ebx
-        // ebx += eax
-        // push ebx
+        // NOT NEEDED: mov [esp - 4], ebx
+        //
+        // NOT NEEDED: mov ebx, [esp - 4]
+        // ebx *= eax
+        // mov [esp - 4], ebx
+        //
         // ebx = eax
         // ebx += 9
-        // ebx *= [esp]
-        // ebx += 56
-        // xmm0_s = ebx
+        // mov [esp - 8], ebx
+        //
+        // mov ebx, [esp - 4]
+        // mul ebx, [esp - 8]
+        // mov [esp - 4], ebx
+        //
+        // ebx = ecx
+        // ebx /= 5
+        // mov [esp - 8], ebx
+        //
+        // mov ebx, [esp - 4]
+        // mul ebx, [esp - 8]
+        // NOT NEEDED: mov [esp - 4], ebx
+        //
+        // mov ebx, 56
+        // ebx += [esp - 4]
+        //
         //
         // ACTUALLY i decided to use an xmm register instead of ebx so that it
         // can be used for both int and float operations
@@ -833,6 +848,12 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           } else if (t.load == "u-") {
             // number
             eval_stack.pop();
+            // no im not going to move this into a register
+            // and do proper negation thats so dumb no ones doing that
+            //
+            //
+            // ... i might do that if this doesnt work but im really hoping
+            // it does work
             if (val[0] == '-') {
               val = val.substr(1, val.size() - 1);
             } else
@@ -859,7 +880,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             //
             //
             // actually no im not making this
-            foolproof_add(assembly, cleanup, left, right);
+
+            //  left and right can be either [esp], a register, or a number
 
           } else if (t.load == "-")
             eval_stack.push(left - right);
