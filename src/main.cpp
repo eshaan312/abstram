@@ -504,6 +504,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
       temporary_simd = *temporary_register_opt;
     }
 
+    int current_esp_displacement = 4;
+
     for (const token t : rpn) {
       if (t.type == lex_type::number) {
         eval_stack.push(t.load);
@@ -719,35 +721,55 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
         // one that the layered operations happen in
         //
         // so for example if you have an exp like
-        // xmm0_s = 56 + eax * (eax + 7) * (eax + 9) * (ecx / 5)
-        // rpn: 56 eax eax 7 + * eax 9 + * ecx 5 / * +
+        // xmm0_s = 56 + eax * (eax + 7) * (-eax + 9) * (ecx / 5)
+        // rpn: 56 eax eax 7 + * eax u- 9 + * ecx 5 / * +
+        //
+        // <- eax, 7
         // ebx = eax
         // ebx += 7
-        // NOT NEEDED: mov [esp - 4], ebx
+        // mov [esp - 4], ebx
+        // -> [esp - 4]
         //
-        // NOT NEEDED: mov ebx, [esp - 4]
+        // <- [esp - 4], eax
+        // mov ebx, [esp - 4]
         // ebx *= eax
         // mov [esp - 4], ebx
+        // -> [esp - 4]
         //
+        // <- eax
         // ebx = eax
-        // ebx += 9
+        // ebx = -ebx
         // mov [esp - 8], ebx
+        // -> [esp - 8]
         //
+        // <- [esp - 8], 9
+        // mov ebx, [esp - 8]
+        // ebx += 9
+        // -> [esp - 8]
+        //
+        // <- [esp - 4], [esp - 8]
         // mov ebx, [esp - 4]
         // mul ebx, [esp - 8]
         // mov [esp - 4], ebx
+        // -> [esp - 4]
         //
+        // <- ecx, 5
         // ebx = ecx
         // ebx /= 5
         // mov [esp - 8], ebx
+        // -> [esp - 8]
         //
+        // <- [esp - 4], [esp - 8]
         // mov ebx, [esp - 4]
         // mul ebx, [esp - 8]
-        // NOT NEEDED: mov [esp - 4], ebx
+        // mov [esp - 4], ebx
+        // -> [esp - 4]
         //
+        // <- 56, [esp - 4]
         // mov ebx, 56
+        // mov ebx, [esp - 4]
         // ebx += [esp - 4]
-        //
+        // -> ebx
         //
         // ACTUALLY i decided to use an xmm register instead of ebx so that it
         // can be used for both int and float operations
@@ -782,17 +804,25 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
             std::string genreg_for_things = "";
             if (!register_to_use_for_things) {
-              assembly.push_back("push eax");
+              int_float_assembly_push_back(
+                  int_assembly, float_assembly,
+                  "mov [_compiler_operation_placeholder], eax");
               genreg_for_things = "eax";
             } else {
               genreg_for_things = *register_to_use_for_things;
             }
 
-            assembly.push_back("vmovd " + genreg_for_things + ", " +
-                               temporary_simd);
-            assembly.push_back("push " + genreg_for_things);
+            int_float_assembly_push_back(int_assembly, float_assembly,
+                                         "vmovd " + genreg_for_things + ", " +
+                                             temporary_simd);
+            int_float_assembly_push_back(
+                int_assembly, float_assembly,
+                "mov [esp - " + std::to_string(current_esp_displacement) +
+                    "], " + genreg_for_things); // KEEP THE STACK STILL PLEASE
             if (!register_to_use_for_things) {
-              assembly.push_back("mov eax, [esp + 4]");
+              int_float_assembly_push_back(
+                  int_assembly, float_assembly,
+                  "mov eax, [_compiler_operation_placeholder]");
             }
 
             // ok so lets do it so instead of fucking reversing the change
@@ -818,7 +848,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // ok so i need a temporary register to handle things in parenthesis
             // then for the temporary register if theres anything in parenthesis
             // i push it to the stack
-            eval_stack.push("[esp]");
+            eval_stack.push("[esp - " +
+                            std::to_string(current_esp_displacement) + "]");
+            current_esp_displacement += 4;
           } else if (val[0] == 'e' && t.load == "u-") {
             int_float_assembly_push_back(int_assembly, float_assembly,
                                          "vmovd " + val + ", " +
@@ -831,7 +863,7 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
             std::string genreg_for_things = "";
             if (!register_to_use_for_things) {
-              assembly.push_back("push eax");
+              assembly.push_back("mov [_compiler_operation_placeholder], eax");
               genreg_for_things = "eax";
             } else {
               genreg_for_things = *register_to_use_for_things;
@@ -839,12 +871,16 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
             assembly.push_back("vmovd " + genreg_for_things + ", " +
                                temporary_simd);
-            assembly.push_back("push " + genreg_for_things);
+            assembly.push_back("mov [esp - " +
+                               std::to_string(current_esp_displacement) +
+                               "], " + genreg_for_things);
             if (!register_to_use_for_things) {
-              assembly.push_back("mov eax, [esp + 4]");
+              assembly.push_back("mov eax, [_compiler_operation_placeholder]");
             }
 
-            eval_stack.push("[esp]");
+            eval_stack.push("[esp - " +
+                            std::to_string(current_esp_displacement) + "]");
+            current_esp_displacement += 4;
           } else if (t.load == "u-") {
             // number
             eval_stack.pop();
@@ -881,7 +917,14 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             //
             // actually no im not making this
 
-            //  left and right can be either [esp], a register, or a number
+            //  left and right can be either [esp - X], a register, or a number
+
+            if (left.substr(0, 4) == "[esp") {
+              // so we've gotten a number from stack
+              // what we do here is super important
+              // ok so we've gotta move it out of the
+              // stack and into the temporary register
+            }
 
           } else if (t.load == "-")
             eval_stack.push(left - right);
@@ -1001,6 +1044,8 @@ int main() {
       "register_types: db 0, 0, 0, 0, 0, 0, 0, 0"); // one type space for each
                                                     // xmm
   assembly.push_back("negation_mask: 0x80000000");
+  assembly.push_back("section .bss");
+  assembly.push_back("_compiler_operation_placeholder: resb 4");
   assembly.push_back("section .text");
   assembly.push_back("jmp skip_crash");
   assembly.push_back("crash: ");
