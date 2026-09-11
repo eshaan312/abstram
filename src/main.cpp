@@ -273,7 +273,17 @@ std::optional<std::string>
 find_next_avaliable_general_register(bool requires_8_bit_reg) {
   size_t sz = requires_8_bit_reg ? registers.size() - 2 : registers.size();
   for (auto r : registers) {
-    if (!check_if_register_is_taken(r)) {
+    if (r[0] != 'x' && !check_if_register_is_taken(r)) {
+      return r;
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::optional<std::string> find_next_avaliable_simd_register() {
+  for (auto r : registers) {
+    if (r[0] == 'x' && !check_if_register_is_taken(r)) {
       return r;
     }
   }
@@ -458,8 +468,38 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                          &line_tokens[end_math]};
 
     std::vector<token> rpn = to_rpn(to_do_math_on);
+    std::vector<std::string> float_assembly = {}; // this is for float math
+                                                  // if the type is static float
+                                                  // or if it's dynamic float
+    std::vector<std::string> int_assembly = {};
 
     std::stack<std::string> eval_stack;
+    auto temporary_register_opt = find_next_avaliable_simd_register();
+
+    std::string temporary_simd = "";
+    if (!temporary_register_opt) {
+
+      auto register_to_use_for_things =
+          find_next_avaliable_general_register(true);
+
+      std::string genreg_for_things = "";
+      if (!register_to_use_for_things) {
+        assembly.push_back("push eax");
+        genreg_for_things = "eax";
+      } else {
+        genreg_for_things = *register_to_use_for_things;
+      }
+
+      assembly.push_back("vmovd " + genreg_for_things + ", xmm0");
+      assembly.push_back("push " + genreg_for_things);
+      temporary_simd = "xmm0";
+      if (!register_to_use_for_things) {
+        assembly.push_back("mov eax, [esp + 4]");
+      }
+    } else {
+      temporary_simd = *temporary_register_opt;
+    }
+
     for (const token t : rpn) {
       if (t.type == lex_type::number) {
         eval_stack.push(t.load);
@@ -699,10 +739,6 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           if (val[0] == 'x' && t.load == "u-") {
             std::string first_four_or_3 = val.substr(0, 4);
             // simd regs
-            bool eax_is_taken = register_types.contains("eax");
-            if (eax_is_taken)
-              assembly.push_back("push eax");
-
             // completely revamp the type system to be in runtime partially
             // actually
             //
