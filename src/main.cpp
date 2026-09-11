@@ -536,8 +536,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             if (!register_to_use_for_things)
               assembly.push_back("pop eax");
           }
-        } else if (type == "dynamic" && register_types[first_four_or_3] ==
-                                            "dynamic") { // UNHANDLED TODO
+        } else if (type == "dynamic" &&
+                   register_types[first_four_or_3] == "dynamic") {
           // test if the types are the same
 
           auto register_to_use_for_things =
@@ -576,9 +576,11 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           assembly[assembly.size() - 1] += first_four_or_3[3];
           assembly[assembly.size() - 1] += ']';
 
-          assembly.push_back("cmp " +
-                             lower_lower_register_half[genreg_for_things] +
-                             ", 1"); // 1 means int 2 means float 0 means uninit
+          assembly.push_back(
+              "cmp " + lower_lower_register_half[genreg_for_things] + ", " +
+              lower_lower_register_half[genreg_for_things2]); // 1 means int 2
+                                                              // means float 0
+                                                              // means uninit
           assembly.push_back("je true_type_" + std::to_string(label_counter));
           assembly.push_back("mov bl, 'T'");
           assembly.push_back("jne crash");
@@ -587,32 +589,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           ++label_counter;
           if (!register_to_use_for_things)
             assembly.push_back("pop eax");
-        } else if (register_types[first_four_or_3] == "float") {
-          auto register_to_use_for_things =
-              find_next_avaliable_general_register(true);
-
-          std::string genreg_for_things = "";
-          if (!register_to_use_for_things) {
-            assembly.push_back("push eax");
-            genreg_for_things = "eax";
-          } else {
-            genreg_for_things = *register_to_use_for_things;
-          }
-
-          assembly.push_back(
-              "mov " + lower_lower_register_half[genreg_for_things] + ", ");
-          assembly[assembly.size() - 1] += type_location;
-
-          assembly.push_back(
-              "cmp al, 2"); // 1 means int 2 means float 0 means uninit
-          assembly.push_back("je true_type_" + std::to_string(label_counter));
-          assembly.push_back("mov bl, 'T'");
-          assembly.push_back("jne crash");
-          assembly.push_back("true_type_" + std::to_string(label_counter) +
-                             ":");
-          ++label_counter;
-          if (!register_to_use_for_things)
-            assembly.push_back("pop eax");
+          if (!register_to_use_for_things2)
+            assembly.push_back("pop ebx");
         } else if (register_types[first_four_or_3] == "dynamic") { // handled
           // test if the input register is the same as the static type of the
           // expression
@@ -681,6 +659,38 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
           }
         }
       } else if (t.type == lex_type::symbol) {
+
+        // ok so what we have to do here is really annoying
+        // so basically there are a couple things
+        // the first is we check to see if the type of the expression is dynamic
+        // if it is then we need two new std::vectors, one for the integer
+        // operations and one for the float operations
+        //
+        // afterwards, we make an integer label and a float label and have it
+        // jump to whatever the type of the expression is
+        //
+        // ok so the next thing we need to do is we need to have the main
+        // register and we need to have a secondary register the main register
+        // is the one the operation is being done on the second register is the
+        // one that the layered operations happen in
+        //
+        // so for example if you have an exp like
+        // xmm0_s = 56 + eax * (eax + 7) * (eax + 9)
+        // then the rpn would be 56 eax eax 7 + * eax 9 + * +
+        // then you would do
+        // ebx = eax
+        // ebx += 7
+        // ebx += eax
+        // push ebx
+        // ebx = eax
+        // ebx += 9
+        // ebx *= [esp]
+        // ebx += 56
+        // xmm0_s = ebx
+        //
+        // eventually we can do the optimization to use every avaliable register
+        // before spilling to the stack, but for now just using one register is
+        // probably good enough
 
         if (t.load == "u+" || t.load == "u-") {
           if (eval_stack.empty())
