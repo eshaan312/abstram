@@ -9,6 +9,18 @@
 #include <unordered_set>
 #include <vector>
 
+// to anyone reading this code
+// im sorry
+// also ignore most of the comment other than this
+// theyre just my thoughts when making this program
+// and theyre very convoluted
+//
+// one day ill refactor this code, but i made this compiler
+// at the same time as i was making all the language design
+// decisions as a fun project brain teaser thing
+// so the code is not going to be very fun to read
+// its very very messy
+
 enum class lex_type { symbol, word, number, newline };
 
 int label_counter = 0;
@@ -950,7 +962,6 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // actually no im not making this
 
             //  left and right can be either [esp - X], a register, or a number
-
             if (left.substr(0, 5) == "[esp ") {
               // so we've gotten a number from stack
               // what we do here is super important
@@ -1029,10 +1040,38 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               // vpinsrd temporary_simd_2, temporary_simd_2, right
               // vaddss temporary_simd, temporary_simd, temporary_simd_2
 
-              int_float_assembly_push_back(int_assembly, float_assembly,
-                                           "vpinsrd " + temporary_simd_2 +
-                                               ", " + temporary_simd_2 + ", " +
-                                               right);
+              if (right[0] == '[' || right[0] == 'e') {
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd_2 + ", " + temporary_simd_2 +
+                        ", " + right + ", 0"); // moves right into the first
+                                               // slot of temporary_simd
+              } else {
+                auto register_to_use_for_things_x =
+                    find_next_avaliable_general_register(true);
+
+                std::string genreg_for_things_x = "";
+                if (!register_to_use_for_things_x) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "push eax");
+                  genreg_for_things_x = "eax";
+                } else {
+                  genreg_for_things_x = *register_to_use_for_things_x;
+                }
+                std::string mov_cmd = (right[0] == 'x') ? "vmovd " : "mov ";
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             mov_cmd + genreg_for_things_x +
+                                                 ", " + right);
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                        genreg_for_things_x +
+                        ", 0"); // moves right into the first
+                                // slot of temporary_simd
+                if (!register_to_use_for_things_x)
+                  int_float_assembly_push_back("pop eax");
+              }
+
               int_assembly.push_back("vpaddd " + temporary_simd + ", " +
                                      temporary_simd + ", " + temporary_simd_2);
               float_assembly.push_back("vaddss " + temporary_simd + ", " +
@@ -1050,24 +1089,37 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               // [esp - 128]
             } else if (right.substr(0, 5) == "[esp ") {
               eval_stack.push(right);
-              auto register_to_use_for_things_x =
-                  find_next_avaliable_general_register(true);
-
-              std::string genreg_for_things_x = "";
-              if (!register_to_use_for_things_x) {
-                int_float_assembly_push_back(int_assembly, float_assembly,
-                                             "push eax");
-                genreg_for_things_x = "eax";
+              if (left[0] == '[' || left[0] == 'e') {
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                        left + ", 0"); // moves left into the first
+                                       // slot of temporary_simd
               } else {
-                genreg_for_things_x = *register_to_use_for_things_x;
+                auto register_to_use_for_things_x =
+                    find_next_avaliable_general_register(true);
+
+                std::string genreg_for_things_x = "";
+                if (!register_to_use_for_things_x) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "push eax");
+                  genreg_for_things_x = "eax";
+                } else {
+                  genreg_for_things_x = *register_to_use_for_things_x;
+                }
+                std::string mov_cmd = (left[0] == 'x') ? "vmovd " : "mov ";
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             mov_cmd + genreg_for_things_x +
+                                                 ", " + left);
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                        genreg_for_things_x +
+                        ", 0"); // moves left into the first
+                                // slot of temporary_simd
+                if (!register_to_use_for_things_x)
+                  int_float_assembly_push_back("pop eax");
               }
-              int_float_assembly_push_back(
-                  int_assembly, float_assembly,
-                  "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
-                      genreg_for_things_x + ", 0"); // moves left into the first
-                                                    // slot of temporary_simd
-              if (!register_to_use_for_things_x)
-                int_float_assembly_push_back("pop eax");
 
               auto temporary_register_opt_2 =
                   find_next_avaliable_simd_register();
@@ -1152,6 +1204,163 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                   "add esp, 8"); // to revert the stack to normal otherwise the
                                  // original temporary simd register will not be
                                  // tracked properly
+            }
+            // things still left to handle for addition
+            // handling the general case here:
+            else {
+              eval_stack.push("[esp - " + current_esp_displacement);
+              current_esp_displacement += 4;
+              if (left[0] == '[' || left[0] == 'e') {
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                        left + ", 0"); // moves left into the first
+                                       // slot of temporary_simd
+              } else {
+                auto register_to_use_for_things_x =
+                    find_next_avaliable_general_register(true);
+
+                std::string genreg_for_things_x = "";
+                if (!register_to_use_for_things_x) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "push eax");
+                  genreg_for_things_x = "eax";
+                } else {
+                  genreg_for_things_x = *register_to_use_for_things_x;
+                }
+                std::string mov_cmd = (left[0] == 'x') ? "vmovd " : "mov ";
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             mov_cmd + genreg_for_things_x +
+                                                 ", " + left);
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                        genreg_for_things_x +
+                        ", 0"); // moves left into the first
+                                // slot of temporary_simd
+                if (!register_to_use_for_things_x)
+                  int_float_assembly_push_back("pop eax");
+              }
+
+              auto temporary_register_opt_2 =
+                  find_next_avaliable_simd_register();
+
+              std::string temporary_simd_2 = "";
+              if (!temporary_register_opt_2) {
+
+                auto register_to_use_for_things =
+                    find_next_avaliable_general_register(true);
+
+                std::string genreg_for_things = "";
+                if (!register_to_use_for_things) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "push eax");
+                  genreg_for_things = "eax";
+                } else {
+                  genreg_for_things = *register_to_use_for_things;
+                }
+
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             "vmovd " + genreg_for_things +
+                                                 ", xmm1");
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             "push " + genreg_for_things);
+                temporary_simd_2 = "xmm1";
+                if (!register_to_use_for_things) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "mov eax, [esp + 4]");
+                }
+              } else {
+                temporary_simd_2 = *temporary_register_opt_2;
+              }
+
+              // OKAY BE VERY CAREFUL
+              // IN THIS CURRENT SITATION
+              // iff !temporary_register_opt
+              // THEN
+              // temporary_simd was xmm0 now = [esp + 8]
+              // and iff !temporary_register_opt_2
+              // THEN
+              // temporary_simd_2 was xmm1 now = [esp]
+              //
+              // check if right is either xmm0 or xmm1 and if right has
+
+              if (left == "[esp]")
+                left = "[esp + 8]";
+
+              else if (left == "xmm1" && !temporary_register_opt_2) {
+                left = "[esp]";
+              }
+
+              if (right == "[esp]")
+                right = "[esp + 8]";
+
+              else if (right == "xmm1" && !temporary_register_opt_2) {
+                right = "[esp]";
+              }
+
+              // for int
+              // vpinsrd temporary_simd_2, temporary_simd_2, right
+              // vpaddd temporary_simd, temporary_simd, temporary_simd_2
+              //
+              // for float
+              // vpinsrd temporary_simd_2, temporary_simd_2, right
+              // vaddss temporary_simd, temporary_simd, temporary_simd_2
+
+              if (right[0] == '[' || right[0] == 'e') {
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd_2 + ", " + temporary_simd_2 +
+                        ", " + right + ", 0"); // moves right into the first
+                                               // slot of temporary_simd
+              } else {
+                auto register_to_use_for_things_x =
+                    find_next_avaliable_general_register(true);
+
+                std::string genreg_for_things_x = "";
+                if (!register_to_use_for_things_x) {
+                  int_float_assembly_push_back(int_assembly, float_assembly,
+                                               "push eax");
+                  genreg_for_things_x = "eax";
+                } else {
+                  genreg_for_things_x = *register_to_use_for_things_x;
+                }
+                std::string mov_cmd = (right[0] == 'x') ? "vmovd " : "mov ";
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             mov_cmd + genreg_for_things_x +
+                                                 ", " + right);
+                int_float_assembly_push_back(
+                    int_assembly, float_assembly,
+                    "vpinsrd" + temporary_simd + ", " + temporary_simd + ", " +
+                        genreg_for_things_x +
+                        ", 0"); // moves right into the first
+                                // slot of temporary_simd
+                if (!register_to_use_for_things_x)
+                  int_float_assembly_push_back("pop eax");
+              }
+
+              int_assembly.push_back("vpaddd " + temporary_simd + ", " +
+                                     temporary_simd + ", " + temporary_simd_2);
+              float_assembly.push_back("vaddss " + temporary_simd + ", " +
+                                       temporary_simd + ", " +
+                                       temporary_simd_2);
+
+              if (!temporary_register_opt)
+                int_float_assembly_push_back(int_assembly, float_assembly,
+                                             "vpinsrd xmm1, xmm1, [esp], 0");
+              int_float_assembly_push_back(
+                  int_assembly, float_assembly,
+                  "add esp, 8"); // to revert the stack to normal otherwise the
+                                 // original temporary simd register will not be
+                                 // tracked properly
+                                 //
+                                 //
+                                 // 8 is correct here bc we didnt pop eax
+                                 // when we were figuring out the second temp
+                                 // simd reg, we just moved its og value back
+                                 //
+                                 // just dont question that its 8 again its not
+                                 // worth the 2 minute headache
             }
 
           } else if (t.load == "-")
