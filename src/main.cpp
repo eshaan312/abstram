@@ -1385,9 +1385,53 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
     if (eval_stack.size() != 1)
       return std::unexpected("couldn't figure it out");
 
-    return std::to_string(eval_stack.top());
+    if (type == "int") {
+      for (auto item_in_int_assembly : int_assembly) {
+        assembly.push_back(item_in_int_assembly);
+      }
+    } else if (type == "float") {
+      for (auto item_in_float_assembly : float_assembly) {
+        assembly.push_back(item_in_float_assembly);
+      }
+    } else if (type == "dynamic") {
+      auto register_to_use_for_things =
+          find_next_avaliable_general_register(true);
+
+      std::string genreg_for_things = "";
+      if (!register_to_use_for_things) {
+        assembly.push_back("push eax");
+        genreg_for_things = "eax";
+      } else {
+        genreg_for_things = *register_to_use_for_things;
+      }
+
+      assembly.push_back("mov " + lower_lower_register_half[genreg_for_things] +
+                         ", " + type_location);
+      assembly.push_back("cmp " + lower_lower_register_half[genreg_for_things] +
+                         ", 1");
+      if (!register_to_use_for_things)
+        assembly.push_back("pop eax");
+      assembly.push_back("je int_" + std::to_string(label_counter));
+      for (auto item_in_float_assembly : float_assembly) {
+        assembly.push_back(item_in_float_assembly);
+      }
+      assembly.push_back("jmp skip_" + std::to_string(label_counter));
+      assembly.push_back("int_" + std::to_string(label_counter) + ":");
+      for (auto item_in_int_assembly : int_assembly) {
+        assembly.push_back(item_in_int_assembly);
+      }
+
+      assembly.push_back("skip_" + std::to_string(label_counter) + ":");
+
+      ++label_counter;
+    }
+
     if (!temporary_register_opt)
       assembly.push_back("vpinsrd xmm0, xmm0, [esp], 0");
+
+    // returns the memory dereferenced address, something like
+    // [esp - 128] or whatever
+    return eval_stack.top();
   }
 
   return std::unexpected("returned at the end: couldn't figure it out");
