@@ -2213,7 +2213,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // throughout my hundreds of scratch projects, i never once
             // defined ANY custom blocks
             //
-            // and i continue doing that today
+            // and i continue doing that today. i love reusing code. in fact im
+            // even going to reuse this comment
           } else if (t.load == "/") { // TODO: HANDLE DIVISION
             // foolproof operation functions handle when the inputs are
             // general register, xmm register, or a normal number
@@ -2639,7 +2640,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // throughout my hundreds of scratch projects, i never once
             // defined ANY custom blocks
             //
-            // and i continue doing that today
+            // and i continue doing that today. i love reusing code. in fact im
+            // even going to reuse this comment
           } else if (t.load == "%") {
             if (right == 0.0f)
               return std::unexpected("can't modulus by zero");
