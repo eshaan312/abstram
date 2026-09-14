@@ -2753,6 +2753,67 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
                  source[line][t + 2].load +
                  " instead of int or float on line " + std::to_string(line + 1);
       }
+      if (registers.contains(source[line][t].load) &&
+          source[line][t + 1].load == "=") {
+
+        std::vector<std::string> cleanup = {""};
+        std::string type_location = "";
+        if (source[line][t].load[0] == 'x') {
+          type_location = "[register_types +";
+          type_location += (source[line][t].load[3]);
+          type_location += ']';
+          auto expected_number_result_1 = expected_number(
+              source[line], t + 2, assembly, cleanup,
+              register_types[source[line][t].load], line + 1, type_location);
+
+          if (!expected_number_result_1.has_value())
+            return expected_number_result_1.error() + " on line " +
+                   std::to_string(line + 1);
+          auto expected_number_result_2 = expected_number(
+              source[line], t + 2, assembly, cleanup,
+              register_types[source[line][t].load], line + 1, type_location);
+
+          if (!expected_number_result_2.has_value())
+            return expected_number_result_2.error() + " on line " +
+                   std::to_string(line + 1);
+          auto expected_number_result_3 = expected_number(
+              source[line], t + 2, assembly, cleanup,
+              register_types[source[line][t].load], line + 1, type_location);
+
+          if (!expected_number_result_3.has_value())
+            return expected_number_result_3.error() + " on line " +
+                   std::to_string(line + 1);
+          auto expected_number_result_4 = expected_number(
+              source[line], t + 2, assembly, cleanup,
+              register_types[source[line][t].load], line + 1, type_location);
+
+          if (!expected_number_result_4.has_value())
+            return expected_number_result_4.error() + " on line " +
+                   std::to_string(line + 1);
+
+          assembly.push_back("section .data");
+          // this doesnt work because if the thing isnt a constant then you
+          // can't do that
+          //
+          //
+          //
+          // sad
+          assembly.push_back("var_" + std::to_string(label_counter) + ": dd " +
+                             *expected_number_result_1);
+          assembly.push_back("section .text");
+          assembly.push_back("");
+          ++label_counter;
+
+        } else { // gen regs
+          auto expected_number_result = expected_number(
+              source[line], t + 2, assembly, cleanup,
+              register_types[source[line][t].load], line + 1, type_location);
+
+          if (!expected_number_result.has_value())
+            return expected_number_result.error() + " on line " +
+                   std::to_string(line + 1);
+        }
+      }
 
       if (source[line][t].type == lex_type::word &&
           source[line][t + 1].load == ":") {
@@ -2766,15 +2827,21 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
         // not providing a valid type because the expected number won't access
         // it since this is compiler not runtime
         // i shd probably add a check for that actually
-        if (source[line][t + 3].load == "runtime" ||
-            expression_registers.contains(source[line][t + 3].load)) {
-          return "on line " + std::to_string(line + 1) +
-                 "an alloc can't be decided at runtime, nothing dynamic is "
-                 "allowed. this is os dev so alloc as much as you want";
-        }
+        //
+        //
+        //
+        // add this back later
+        // if (source[line][t + 3].load == "runtime" ||
+        //     expression_registers.contains(source[line][t + 3].load)) {
+        //   return "on line " + std::to_string(line + 1) +
+        //          "an alloc can't be decided at runtime, nothing dynamic is "
+        //          "allowed. this is os dev so alloc as much as you want";
+        // }
 
-        auto expected_number_result = expected_number(
-            source[line], t + 3, assembly, cleanup, type, line + 1, "");
+        std::string tp = "float";
+        auto expected_number_result =
+            expected_number(source[line], t + 3, assembly, cleanup, tp,
+                            line + 1, "[type_things+5]");
         if (!expected_number_result.has_value())
           return expected_number_result.error() + " on line " +
                  std::to_string(line + 1);
@@ -2802,7 +2869,8 @@ int main() {
   // "xmm7", "eax",  "ebx",  "ecx",  "edx",  "edi",  "esi"};
 
   std::vector<std::string> source = {
-      "field: alloc compiler.float_calculator {-1 + 3 / 2}"};
+      "xmm0: float\neax: int\nfield: alloc runtime.calculator{-1 + "
+      "xmm0_s / 2}"};
   std::vector<token> source_lex_1d;
 
   lex(source, source_lex_1d);
