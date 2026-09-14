@@ -546,7 +546,6 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
 
         // WHAT IF THE TYPE OF THE EXPRESSION IS DYNAMIC
 
-        // TODO: block modulus from being used on floats
         if (!expression_registers.contains(t.load)) { // handled
           return t.load + " isn't a register allowed in expressions";
         } else if ((register_types[first_four_or_3] != type) &&
@@ -2304,6 +2303,13 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               // vpinsrd temporary_simd_2, temporary_simd_2, right
               // vaddss temporary_simd, temporary_simd, temporary_simd_2
 
+              // im pretty sure converting an xmm to a float, dividing, then
+              // truncate converting back to int for int division isnt the best
+              // strategy
+              //
+              // but i also dont want to handle moving both things to genregs
+              // and idiving and sending them back to xmm regs, thatd be super
+              // annoying
               if (right[0] == '[' || right[0] == 'e') {
                 int_float_assembly_push_back(
                     int_assembly, float_assembly,
@@ -2456,8 +2462,13 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                            "vpinsrd " + temporary_simd_2 +
                                                ", " + temporary_simd_2 + ", " +
                                                right);
-              int_assembly.push_back("vpmuld " + temporary_simd + ", " +
-                                     temporary_simd + ", " + temporary_simd_2);
+              // int_assembly.push_back("vpmuld " + temporary_simd + ", " +
+              //                        temporary_simd + ", " +
+              //                        temporary_simd_2);
+              // here in int assembly we convert temporary simd and temproary
+              // simd 2 into floats, in both assemblies we divide, then in int
+              // assembly we convert the final result one to int and that should
+              // be it
               float_assembly.push_back("vmulss " + temporary_simd + ", " +
                                        temporary_simd + ", " +
                                        temporary_simd_2);
@@ -2643,9 +2654,9 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // and i continue doing that today. i love repeating code. in fact
             // im even going to repeat this comment
           } else if (t.load == "%") {
-            if (right == 0.0f)
-              return std::unexpected("can't modulus by zero");
-            eval_stack.push(std::fmod(left, right));
+            // TODO: have float_assembly insert a crash here, int_assembly shd
+            // work like normal
+            // runtime float modulus isn't supported in this language
           } else {
             return std::unexpected("what is this: " + t.load);
           }
