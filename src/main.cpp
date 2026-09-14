@@ -2343,11 +2343,16 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                                "pop eax");
               }
 
-              int_assembly.push_back("vpmuld " + temporary_simd + ", " +
-                                     temporary_simd + ", " + temporary_simd_2);
-              float_assembly.push_back("vmulss " + temporary_simd + ", " +
-                                       temporary_simd + ", " +
-                                       temporary_simd_2);
+              int_assembly.push_back("cvtsi2ss " + temporary_simd + ", " +
+                                     temporary_simd);
+              int_assembly.push_back("cvtsi2ss " + temporary_simd_2 + ", " +
+                                     temporary_simd_2);
+              int_float_assembly_push_back(int_assembly, float_assembly,
+                                           "vdivss " + temporary_simd + ", " +
+                                               temporary_simd + ", " +
+                                               temporary_simd_2);
+              int_assembly.push_back("cvtss2si " + temporary_simd + ", " +
+                                     temporary_simd);
 
               if (!temporary_register_opt)
                 int_float_assembly_push_back(int_assembly, float_assembly,
@@ -2468,10 +2473,17 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
               // here in int assembly we convert temporary simd and temproary
               // simd 2 into floats, in both assemblies we divide, then in int
               // assembly we convert the final result one to int and that should
-              // be it
-              float_assembly.push_back("vmulss " + temporary_simd + ", " +
-                                       temporary_simd + ", " +
-                                       temporary_simd_2);
+              // be it cvtsi2ss
+              int_assembly.push_back("cvtsi2ss " + temporary_simd + ", " +
+                                     temporary_simd);
+              int_assembly.push_back("cvtsi2ss " + temporary_simd_2 + ", " +
+                                     temporary_simd_2);
+              int_float_assembly_push_back(int_assembly, float_assembly,
+                                           "vdivss " + temporary_simd + ", " +
+                                               temporary_simd + ", " +
+                                               temporary_simd_2);
+              int_assembly.push_back("cvtss2si " + temporary_simd + ", " +
+                                     temporary_simd);
 
               if (!temporary_register_opt)
                 int_float_assembly_push_back(int_assembly, float_assembly,
@@ -2619,11 +2631,16 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
                                                "pop eax");
               }
 
-              int_assembly.push_back("vpmuld " + temporary_simd + ", " +
-                                     temporary_simd + ", " + temporary_simd_2);
-              float_assembly.push_back("vmulss " + temporary_simd + ", " +
-                                       temporary_simd + ", " +
-                                       temporary_simd_2);
+              int_assembly.push_back("cvtsi2ss " + temporary_simd + ", " +
+                                     temporary_simd);
+              int_assembly.push_back("cvtsi2ss " + temporary_simd_2 + ", " +
+                                     temporary_simd_2);
+              int_float_assembly_push_back(int_assembly, float_assembly,
+                                           "vdivss " + temporary_simd + ", " +
+                                               temporary_simd + ", " +
+                                               temporary_simd_2);
+              int_assembly.push_back("cvtss2si " + temporary_simd + ", " +
+                                     temporary_simd);
 
               if (!temporary_register_opt)
                 int_float_assembly_push_back(int_assembly, float_assembly,
