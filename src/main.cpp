@@ -2671,9 +2671,8 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             // and i continue doing that today. i love repeating code. in fact
             // im even going to repeat this comment
           } else if (t.load == "%") {
-            // TODO: have float_assembly insert a crash here, int_assembly shd
-            // work like normal
-            // runtime float modulus isn't supported in this language
+            return std::unexpected(
+                "runtime modulus isn't supported at this time. sorry!");
           } else {
             return std::unexpected("what is this: " + t.load);
           }
