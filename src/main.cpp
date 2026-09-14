@@ -2214,7 +2214,18 @@ expected_number(const std::vector<token> &line_tokens, int index_of_number,
             //
             // and i continue doing that today. i love repeating code. in fact
             // im even going to repeat this comment
-          } else if (t.load == "/") { // TODO: HANDLE DIVISION
+          } else if (t.load ==
+                     "/") { //
+                            // TODO: GET ALL THE PUSH EAX's OUT OF HERE AND MOVE
+                            // THEM TO THE STATIC SPACE FOR HOLDING EAX
+                            // I THOUGHT THIS WAS ALREADY IN UR BRAIN ESHAAN
+                            // HOW DID YOU FORGET
+                            //
+                            //
+                            //
+                            // FUCKKKK
+                            //
+                            //
             // foolproof operation functions handle when the inputs are
             // general register, xmm register, or a normal number
             // it also handles cleaning up based. so like if the left
@@ -2794,6 +2805,8 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
           assembly.push_back("section .data");
           // this doesnt work because if the thing isnt a constant then you
           // can't do that
+          // TODO: GET THIS WORKING FOR BOTH GENERAL REGISTERS AND SIMD
+          // REGISTERS
           //
           //
           //
@@ -2831,16 +2844,15 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
         //
         //
         // add this back later
-        // if (source[line][t + 3].load == "runtime" ||
-        //     expression_registers.contains(source[line][t + 3].load)) {
-        //   return "on line " + std::to_string(line + 1) +
-        //          "an alloc can't be decided at runtime, nothing dynamic is "
-        //          "allowed. this is os dev so alloc as much as you want";
-        // }
+        if (source[line][t + 3].load == "runtime" ||
+            expression_registers.contains(source[line][t + 3].load)) {
+          return "on line " + std::to_string(line + 1) +
+                 "an alloc can't be decided at runtime, nothing dynamic is "
+                 "allowed. this is os dev so alloc as much as you want";
+        }
 
-        std::string tp = "float";
         auto expected_number_result =
-            expected_number(source[line], t + 3, assembly, cleanup, tp,
+            expected_number(source[line], t + 3, assembly, cleanup, type,
                             line + 1, "[type_things+5]");
         if (!expected_number_result.has_value())
           return expected_number_result.error() + " on line " +
@@ -2850,10 +2862,6 @@ std::optional<std::string> evaluate(std::vector<std::vector<token>> &source,
         assembly.push_back(source[line][t].load + ": resb " +
                            *expected_number_result);
         assembly.push_back("section .text");
-
-        for (std::string l : cleanup) {
-          assembly.push_back(l);
-        }
       }
     }
   next_line:
